@@ -41,11 +41,6 @@ jobs:
           PUBLIC_GITHUB_REPO: ${{ github.repository }}
           PUBLIC_GITHUB_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
   deploy:
     environment:
       name: github-pages
