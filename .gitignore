@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.astro/
+*.tsbuildinfo
+
+# 环境变量与密钥 —— 永不提交
+.env
+.env.*
+*.local
+.envrc
+
+# 状态历史日志（由 sync-status 生成，按需提交 status.json，忽略历史明细）
+public/live/*.jsonl
+
+# 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*.local

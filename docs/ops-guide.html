@@ -1,0 +1,264 @@
+<title>部署操作指南</title>
+<style>
+  :root {
+    --paper: #eaeae8;
+    --paper-2: #f4f2ef;
+    --ink: #1a1a19;
+    --ink-2: #46463f;
+    --ink-3: #77776e;
+    --hairline: #c9c4b8;
+    --accent: #c8412b;
+    --accent-ink: #8f2415;
+    --code-bg: #e0ded8;
+    --blockquote: #d6d2c8;
+    --chip: #dcd9d0;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  :root[data-theme="dark"] {
+    --paper: #1a1a19;
+    --paper-2: #21211f;
+    --ink: #eaeae8;
+    --ink-2: #c2c2ba;
+    --ink-3: #8a8a82;
+    --hairline: #3a3a35;
+    --accent: #e4634a;
+    --accent-ink: #ff9d88;
+    --code-bg: #262624;
+    --blockquote: #33332f;
+    --chip: #2e2e2a;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    font-size: 17px;
+    transition: background .3s var(--ease-out), color .3s var(--ease-out);
+  }
+  ::selection { background: var(--accent); color: var(--paper); }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem clamp(1.2rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--hairline);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .topbar__brand { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .78rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink); text-decoration: none; }
+  .topbar__brand em { font-style: normal; color: var(--accent); }
+  .theme-toggle {
+    font: inherit; font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .72rem; letter-spacing: .12em;
+    background: transparent; color: var(--ink-2); border: 1px solid var(--hairline);
+    padding: .3rem .7rem; cursor: pointer; border-radius: 2px;
+    transition: color .2s var(--ease-out), border-color .2s var(--ease-out);
+  }
+  .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: clamp(3.5rem, 9vw, 6.5rem) clamp(1.2rem, 6vw, 4.5rem) clamp(2.5rem, 6vw, 4rem); }
+  .hero__kicker { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .78rem; letter-spacing: .22em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.1rem; }
+  .hero h1 { font-size: clamp(2.2rem, 6.5vw, 4rem); line-height: 1.06; letter-spacing: -0.02em; font-weight: 650; margin-bottom: 1.2rem; }
+  .hero h1 .soft { color: var(--ink-3); font-weight: 500; }
+  .hero__lede { max-width: 42rem; color: var(--ink-2); font-size: clamp(1rem, 1.8vw, 1.15rem); }
+  .hero__meta { margin-top: 1.8rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+  .chip {
+    font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .72rem; letter-spacing: .1em;
+    background: var(--chip); color: var(--ink-2); padding: .32rem .7rem; border-radius: 3px;
+  }
+
+  /* ---------- 正文 ---------- */
+  .article { max-width: 46rem; margin: 0 auto; padding: 0 clamp(1.2rem, 6vw, 3rem) 5rem; }
+  .article h2 {
+    font-size: clamp(1.3rem, 2.6vw, 1.6rem); letter-spacing: -0.015em; font-weight: 650;
+    margin: 3.2rem 0 1rem; padding-top: 1.6rem; border-top: 1px solid var(--hairline);
+    scroll-margin-top: 5rem;
+  }
+  .article h2 .no { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; color: var(--accent); font-size: .72em; letter-spacing: .1em; margin-right: .6rem; }
+  .article h3 { font-size: 1.08rem; font-weight: 650; margin: 1.8rem 0 .6rem; }
+  .article p { color: var(--ink-2); margin-bottom: 1rem; }
+  .article strong { color: var(--ink); font-weight: 650; }
+  .article a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  .article a:hover { border-color: var(--accent); }
+
+  .article ol { counter-reset: step; list-style: none; margin: 1.2rem 0 1.4rem; padding: 0; }
+  .article ol > li {
+    counter-increment: step; position: relative;
+    padding: 1.1rem 1.2rem 1.1rem 3.4rem; margin-bottom: .8rem;
+    background: var(--paper-2); border: 1px solid var(--hairline); border-radius: 4px;
+    color: var(--ink-2);
+  }
+  .article ol > li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute; left: 1.05rem; top: 1.15rem;
+    font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .72rem; color: var(--accent);
+    letter-spacing: .06em;
+  }
+  .article ol > li strong { display: block; color: var(--ink); margin-bottom: .15rem; }
+
+  .article ul { list-style: none; margin: 0 0 1.2rem; padding: 0; }
+  .article ul > li { position: relative; padding-left: 1.3rem; color: var(--ink-2); margin-bottom: .5rem; }
+  .article ul > li::before {
+    content: ""; position: absolute; left: .15rem; top: .72em;
+    width: 6px; height: 6px; transform: rotate(45deg);
+    background: var(--accent);
+  }
+
+  code {
+    font-family: "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    font-size: .86em; background: var(--code-bg); color: var(--ink);
+    padding: .12em .38em; border-radius: 3px;
+  }
+  pre {
+    background: var(--ink); color: var(--paper);
+    padding: 1.1rem 1.3rem; border-radius: 4px; overflow-x: auto;
+    margin: 1rem 0 1.3rem; line-height: 1.6; font-size: .84rem;
+  }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: 1em; }
+
+  blockquote {
+    border-left: 3px solid var(--accent); background: var(--blockquote);
+    padding: .9rem 1.2rem; border-radius: 0 4px 4px 0; margin: 1.2rem 0 1.4rem;
+    color: var(--ink-2); font-size: .95rem;
+  }
+  blockquote p { margin: 0; }
+
+  .divider {
+    height: 1px; background: linear-gradient(90deg, var(--accent), transparent);
+    margin: 0 clamp(1.2rem, 6vw, 3rem) 3.5rem;
+    transform-origin: left; animation: grow .8s var(--ease-out) both;
+  }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  footer { padding: 2.5rem clamp(1.2rem, 6vw, 3rem) 4rem; border-top: 1px solid var(--hairline); }
+  footer p { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .74rem; letter-spacing: .14em; color: var(--ink-3); text-transform: uppercase; max-width: 46rem; margin: 0 auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .001s !important; transition-duration: .001s !important; }
+  }
+  @media (max-width: 560px) {
+    .article ol > li { padding-left: 2.8rem; }
+  }
+</style>
+
+<header class="topbar">
+  <a class="topbar__brand" href="#">Agent <em>Workspace</em> · 部署指南</a>
+  <button class="theme-toggle" id="themeBtn" type="button" aria-label="切换亮暗主题">☾ 主题</button>
+</header>
+
+<section class="hero">
+  <p class="hero__kicker">DEPLOY RUNBOOK — 一次性操作清单</p>
+  <h1>把个人网站部署到<br>GitHub Pages <span class="soft">（约 10 分钟）</span></h1>
+  <p class="hero__lede">本项目代码已全部开发完成并通过构建与审查门。下面是唯一需要你亲手操作的部分：建仓、推送、开启 Pages、配置一个密钥。其余环境变量由流水线自动注入。</p>
+  <div class="hero__meta">
+    <span class="chip">ASTRO 5</span>
+    <span class="chip">GITHUB PAGES</span>
+    <span class="chip">NOTION TOKEN</span>
+    <span class="chip">≈ 10 MIN</span>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<article class="article">
+  <h2 id="structure"><span class="no">01</span>项目结构</h2>
+  <p>代码位于 <code>D:\Agent Workspace\personal-site</code>，三条数据管道各司其职：</p>
+  <ul>
+    <li><strong>状态管道</strong> — <code>scripts/sync-status.mjs</code>：agent 会话结束写入 <code>public/live/status.json</code> 并静默推送；首页每 90s 轮询刷新，不触发重建。</li>
+    <li><strong>进度管道</strong> — <code>scripts/generate-progress.mjs</code>：把 wayfinder 决策图谱（<code>.scratch/</code>）渲染为 <code>public/progress.json</code>，进度页直接消费。</li>
+    <li><strong>随笔管道</strong> — <code>scripts/notion-publish.mjs</code> + <code>publish-bridge.mjs</code>：Notion 页面经 <code>@notionhq/client</code> + <code>notion-to-md</code> 转成 Markdown，落盘 <code>src/content/essays/</code>，构建时归档展示。</li>
+  </ul>
+
+  <h2 id="deploy"><span class="no">02</span>首次部署（一次性操作清单）</h2>
+  <p>需要你的 GitHub 账号操作，按顺序执行：</p>
+  <ol>
+    <li><strong>创建仓库</strong>在 GitHub 新建一个仓库（建议同名 <code>personal-site</code>，<strong>Public</strong>）。不勾选 README / .gitignore（本目录已是完整项目）。</li>
+    <li><strong>关联并推送</strong>
+      <pre><code>cd personal-site
+git init
+git add .
+git commit -m "feat: personal site initial"
+git branch -M main
+git remote add origin git@github.com:&lt;你的用户名&gt;/personal-site.git
+git push -u origin main</code></pre>
+    </li>
+    <li><strong>开启 Pages → GitHub Actions</strong>Settings → Pages → Source 选 <strong>GitHub Actions</strong>。流水线会在下次推送时自动跑（<code>.github/workflows/deploy.yml</code>）。</li>
+    <li><strong>配置 Secrets</strong>（Settings → Secrets and variables → Actions）
+      <ul>
+        <li><code>NOTION_TOKEN</code>：你的 Notion integration 的 <code>ntn_</code> PAT（最小权限「Read content」，<strong>1 年有效——请设续期提醒</strong>）。仅 CI / 本地用；公开仓库永不出现。</li>
+        <li>其余环境（<code>ASTRO_BASE</code> / <code>SITE_URL</code> / <code>PUBLIC_GITHUB_REPO</code>）由流水线自动注入，<strong>不需要手动配置</strong>。</li>
+      </ul>
+    </li>
+    <li><strong>验证部署</strong>首次 Actions run 完成后访问 <code>https://&lt;你的用户名&gt;.github.io/personal-site/</code>。首页应显示状态图（两节点：Claude 工作中 / pi 待命）与最近随笔。</li>
+  </ol>
+
+  <blockquote><p>若仓库名不是 <code>personal-site</code>：<code>ASTRO_BASE</code> 已按仓库名注入，无需改代码。</p></blockquote>
+
+  <h2 id="status-report"><span class="no">03</span>Agent 状态上报（Stop hook）</h2>
+  <p>Claude Code 会话结束时由 <strong>Stop hook</strong> 调用 <code>sync-status.mjs</code>，把「谁在做什么」写入公开状态文件：</p>
+  <pre><code>// ~/.claude/settings.json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /path/to/personal-site &amp;&amp; node scripts/sync-status.mjs --agent claude --name Claude --status working --task \"&lt;当前任务&gt;\" --task-status in-progress --push"
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+  <ul>
+    <li>每次会话结束覆盖写入 <code>public/live/status.json</code> 并推送；<code>deploy.yml</code> 已 <code>paths-ignore: public/live/**</code>，<strong>状态推送不触发重建</strong>，仅刷新 raw 数据源。</li>
+    <li>首页客户端每约 90s 轮询 <code>raw.githubusercontent.com/&lt;repo&gt;/main/public/live/status.json</code>（5 分钟缓存地板，匿名限速 ~60/hr，勿加自定义头）。</li>
+    <li>pi / Codex 按同一契约接入：任意 CLI 工具调用 <code>sync-status.mjs</code> 即可。</li>
+  </ul>
+
+  <h2 id="progress"><span class="no">04</span>进度图更新</h2>
+  <pre><code>npm run progress   # 从 .scratch/&lt;effort&gt;/ 生成 public/progress.json（内容变更，推送触发构建）</code></pre>
+
+  <h2 id="notion"><span class="no">05</span>Notion 随笔</h2>
+  <pre><code># 列出数据库文章
+NOTION_TOKEN=ntn_... npm run notion:list -- --database &lt;db_id&gt; [--published-only]
+
+# 发布单篇 / 全部
+NOTION_TOKEN=ntn_... npm run notion:publish -- --database &lt;db_id&gt; --page &lt;page_id&gt; [--commit]
+NOTION_TOKEN=ntn_... npm run notion:publish -- --database &lt;db_id&gt; --all [--commit]</code></pre>
+  <p><strong>网页内自选上传</strong>（本地发布桥，AICD 风格 UI）：</p>
+  <pre><code>NOTION_TOKEN=ntn_... npm run bridge -- --database &lt;db_id&gt;
+# 打开 http://localhost:4174 → 勾选文章 → 发布（自动落盘 + 提交推送）</code></pre>
+  <blockquote><p>安全边界：token 只在本机（env 或 gitignored <code>.env.local</code>），不进仓库、不进 <code>public/</code>。</p></blockquote>
+
+  <h2 id="dev"><span class="no">06</span>本地开发</h2>
+  <pre><code>npm install
+npm run dev       # http://localhost:4321
+npm run build     # 静态产物 → dist/
+npm run preview   # 本地预览构建产物</code></pre>
+</article>
+
+<footer>
+  <p>AGENT WORKSPACE — DEPLOY RUNBOOK · 2026-08-15 · AICD HARD STYLE</p>
+</footer>
+
+<script>
+  const btn = document.getElementById('themeBtn');
+  const stored = localStorage.getItem('pw-theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const apply = (t) => {
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀ 主题' : '☾ 主题';
+  };
+  apply(stored || (prefersDark ? 'dark' : 'light'));
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('pw-theme', next);
+    apply(next);
+  });
+</script>

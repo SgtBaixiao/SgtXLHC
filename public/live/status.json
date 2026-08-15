@@ -1,0 +1,32 @@
+{
+  "schema": "1.0",
+  "updated_at": "2026-08-15T19:50:00.000Z",
+  "generator": "sync-status.mjs",
+  "note": "初始样例状态；由各 agent 的 Stop hook 调用 sync-status.mjs 更新。schema 见 src/lib/status.js。",
+  "agents": [
+    {
+      "id": "claude",
+      "name": "Claude",
+      "status": "working",
+      "current_task": "部署与发布",
+      "task_status": "in-progress",
+      "session": "personal-site",
+      "started_at": "2026-08-15T17:00:00.000Z",
+      "heartbeat": "2026-08-15T19:50:00.000Z",
+      "source": "stop-hook",
+      "note": "实施已锁定决策：Astro + 状态/进度图 + Notion 发布桥"
+    },
+    {
+      "id": "pi",
+      "name": "pi",
+      "status": "idle",
+      "current_task": "待命",
+      "task_status": null,
+      "session": null,
+      "started_at": null,
+      "heartbeat": "2026-08-15T19:40:00.000Z",
+      "source": "manual",
+      "note": "首期第二 agent；按同一契约接入"
+    }
+  ]
+}

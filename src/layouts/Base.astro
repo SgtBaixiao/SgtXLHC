@@ -1,0 +1,119 @@
+---
+import '../styles/global.css';
+import { SITE, base } from '../lib/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  active?: string;
+  ogType?: string;
+}
+
+const {
+  title = SITE.title,
+  description = SITE.description,
+  active = '',
+  ogType = 'website',
+} = Astro.props;
+const pageTitle = title === SITE.title ? SITE.title : `${title} — ${SITE.title}`;
+const canonical = new URL(Astro.url.pathname, SITE.url).href;
+const ogImage = new URL(`${base}favicon.svg`, SITE.url).href;
+const ogUrl = new URL(Astro.url.pathname, SITE.url).href;
+
+const nav = [
+  { href: '/', label: '首页' },
+  { href: '/progress', label: '进度' },
+  { href: '/essays/', label: '随笔' },
+  { href: '/about', label: '关于' },
+];
+---
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{pageTitle}</title>
+  <meta name="description" content={description} />
+  <meta name="generator" content={Astro.generator} />
+  <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+  <link rel="canonical" href={canonical} />
+
+  <meta property="og:title" content={pageTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content={ogType} />
+  <meta property="og:url" content={ogUrl} />
+  <meta property="og:image" content={ogImage} />
+  <meta name="theme-color" content="#1a1a19" />
+</head>
+<body>
+  <div class="loader-mask" aria-hidden="true">
+    <span class="loader-mask__word" style="--i:0">AGENT</span>
+    <span class="loader-mask__word" style="--i:1">WORKSPACE</span>
+  </div>
+
+  <header class="nav">
+    <a class="nav__brand" href={`${base}`}>
+      <span class="nav__brand-mark mono">AGENT·WORKSPACE</span>
+      <span class="nav__brand-sub mono">DEV LOG</span>
+    </a>
+    <nav class="nav__links" aria-label="主导航">
+      {nav.map((n) => {
+        const isActive = active === n.href;
+        return (
+          <a class="mono" href={`${base}${n.href.replace(/^\//, '')}`} aria-current={isActive ? 'page' : undefined}>
+            {n.label}
+          </a>
+        );
+      })}
+    </nav>
+    <button class="btn btn--ghost mono" type="button" data-theme-toggle aria-label="切换深浅色">
+      <span aria-hidden="true">◐</span>
+      <span class="sr-only">切换主题</span>
+    </button>
+  </header>
+
+  <main>
+    <slot />
+  </main>
+
+  <footer class="footer container">
+    <p class="mono">© {new Date().getFullYear()} {SITE.author}</p>
+    <p class="mono">Astro · d3-force · wayfinder · Notion</p>
+  </footer>
+
+  <script>
+    import { base } from '../lib/site';
+    import { initReveal } from '../lib/reveal.js';
+
+    // 主题切换
+    const root = document.documentElement;
+    const saved = localStorage.getItem('theme');
+    if (saved) root.dataset.theme = saved;
+    const btn = document.querySelector('[data-theme-toggle]');
+    btn && btn.addEventListener('click', () => {
+      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      localStorage.setItem('theme', next);
+    });
+
+    // 载入遮罩：动画结束移除
+    const mask = document.querySelector('.loader-mask');
+    mask && mask.addEventListener('animationend', () => mask.remove());
+
+    // 锚点相对 base
+    document.querySelectorAll('a[href^="/"]').forEach((a) => {
+      if (a.getAttribute('href').startsWith(base)) return;
+      if (a.getAttribute('href').startsWith('/')) a.href = base + a.getAttribute('href').slice(1);
+    });
+
+    // 全局细节感：键盘聚焦
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') document.body.classList.add('keyboard');
+    });
+    document.addEventListener('mousedown', () => document.body.classList.remove('keyboard'));
+
+    initReveal(document);
+  </script>
+</body>
+</html>

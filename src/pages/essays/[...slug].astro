@@ -1,0 +1,54 @@
+---
+import Base from '../../layouts/Base.astro';
+import { SITE, base } from '../../lib/site';
+import { entrySlug } from '../../lib/essays';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const essays = (await getCollection('essays')).filter((e) => !e.data.draft);
+  return essays.map((e) => ({
+    params: { slug: entrySlug(e) },
+    props: { entry: e },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const title = entry.data.title;
+const description = entry.data.excerpt || SITE.description;
+---
+
+<Base title={title} description={description} active="/essays/">
+  <article class="container section section--tight">
+    <header class="post__head reader">
+      <p class="mono post__meta">
+        <span>{entry.data.date.toISOString().slice(0, 10)}</span>
+        {(entry.data.tags || []).length > 0 && (
+          <span> · {(entry.data.tags || []).map((t) => <span class="tag mono">{t}</span>)}</span>
+        )}
+      </p>
+      <h1 data-reveal>{title}</h1>
+      {entry.data.excerpt && <p class="post__lede" data-reveal>{entry.data.excerpt}</p>}
+      {entry.data.source && <p class="mono post__source">SOURCE / {entry.data.source}</p>}
+    </header>
+
+    <div class="prose post__body reader">
+      <Content />
+    </div>
+
+    <footer class="post__foot reader">
+      <a class="btn btn--ghost" href={`${base}essays/`}><span aria-hidden="true">←</span> 返回随笔列表</a>
+    </footer>
+  </article>
+</Base>
+
+<style>
+  .post__head { margin-bottom: 2.6rem; }
+  .post__meta { color: var(--ink-faint); margin: 0 0 1.2rem; letter-spacing: var(--track-meta); }
+  .post__meta .tag { margin-right: .3rem; }
+  .post__head h1 { font-size: var(--step-4); letter-spacing: var(--track-display); margin: 0 0 1rem; }
+  .post__lede { color: var(--ink-soft); font-size: var(--step-1); max-width: 40rem; }
+  .post__source { color: var(--ink-ghost); font-size: .72rem; letter-spacing: var(--track-meta); margin-top: 1.2rem; }
+  .post__body { padding-bottom: 2rem; }
+  .post__foot { margin-top: 3rem; }
+</style>

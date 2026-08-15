@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+# 触发：
+#  - push 到 main（public/live/** 除外——状态推送不重建，见 01-free-hosting-realtime-research）
+#  - 手动触发
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'public/live/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Astro
+        uses: withastro/action@v3
+        with:
+          package-manager: npm
+        env:
+          # 项目站点 base 必须匹配仓库名；部署后站点即 <owner>.github.io/<repo>/
+          ASTRO_BASE: /${{ github.event.repository.name }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          # 客户端轮询 raw.githubusercontent 的目标（首页状态图）
+          PUBLIC_GITHUB_REPO: ${{ github.repository }}
+          PUBLIC_GITHUB_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

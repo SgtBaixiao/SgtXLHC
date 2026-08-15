@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# 状态数据是客户端轮询 raw.githubusercontent 的，不索引
+Disallow: /live/

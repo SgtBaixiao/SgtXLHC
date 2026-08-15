@@ -1,0 +1,79 @@
+---
+import Base from '../../layouts/Base.astro';
+import { SITE, base } from '../../lib/site';
+import { entrySlug } from '../../lib/essays';
+import { getCollection } from 'astro:content';
+
+const essays = (await getCollection('essays'))
+  .filter((e) => !e.data.draft)
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const tags = [...new Set(essays.flatMap((e) => e.data.tags || []))].sort();
+---
+
+<Base title="随笔" description={`Notion 随笔归档 — ${SITE.description}`} active="/essays/">
+  <section class="container section section--tight">
+    <div class="section__head">
+      <p class="mono" data-reveal>NOTION / ARCHIVE</p>
+      <h1 data-reveal>随笔</h1>
+      <p class="essays__lede" data-reveal>
+        通过 Notion 发布桥归档的文章。共 {essays.length} 篇
+        {tags.length ? ` · ${tags.length} 个标签` : ''}。
+      </p>
+    </div>
+
+    {tags.length > 0 && (
+      <div class="chips" data-reveal>
+        {tags.map((t) => <span class="tag mono">{t}</span>)}
+      </div>
+    )}
+
+    <div class="essays__list">
+      {essays.map((e) => (
+        <a class="essay" href={`${base}essays/${entrySlug(e)}/`}>
+          <div class="essay__date mono">{e.data.date.toISOString().slice(0, 10)}</div>
+          <div class="essay__main">
+            <h2>{e.data.title}</h2>
+            {e.data.excerpt && <p class="essay__excerpt">{e.data.excerpt}</p>}
+            <div class="essay__meta">
+              <span class="mono essay__source">{(e.data.tags || []).map((t) => <span class="tag mono">{t}</span>)}</span>
+              <span class="mono essay__arrow">READ →</span>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+</Base>
+
+<style>
+  .section__head { margin-bottom: 2.4rem; display: grid; gap: .35rem; }
+  .section__head .mono { color: var(--ink-faint); letter-spacing: var(--track-meta); margin: 0; }
+  .section__head h1 { margin: 0; }
+  .essays__lede { max-width: 40rem; color: var(--ink-soft); margin-top: .8rem; }
+  .chips { margin-bottom: 2.6rem; }
+
+  .essays__list { display: grid; gap: 0; }
+  .essay {
+    display: grid;
+    grid-template-columns: 7rem 1fr;
+    gap: 1.6rem;
+    padding: 1.7rem 0;
+    border-bottom: 1px solid var(--hairline);
+    text-decoration: none;
+    transition: padding-left .4s var(--ease-expo);
+  }
+  .essay:hover { padding-left: .8rem; }
+  .essay__date { color: var(--ink-faint); font-size: var(--step--1); padding-top: .4rem; }
+  .essay__main { min-width: 0; }
+  .essay h2 { margin: 0 0 .4rem; font-size: var(--step-2); letter-spacing: -0.01em; }
+  .essay:hover h2 { color: var(--ink); }
+  .essay__excerpt { color: var(--ink-soft); font-size: var(--step--1); line-height: 1.65; margin: 0 0 .7rem; }
+  .essay__meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .essay__arrow { color: var(--ink-faint); letter-spacing: var(--track-meta); }
+  .essay:hover .essay__arrow { color: var(--ink); }
+  .essay__meta .tag { margin-right: .3rem; }
+  @media (max-width: 560px) {
+    .essay { grid-template-columns: 1fr; gap: .4rem; }
+  }
+</style>

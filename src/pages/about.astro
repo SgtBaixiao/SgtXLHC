@@ -1,0 +1,74 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE, base } from '../lib/site';
+---
+
+<Base title="关于" description={`关于本站 — ${SITE.description}`} active="/about">
+  <section class="container section section--tight">
+    <div class="section__head">
+      <p class="mono" data-reveal>ABOUT / THIS SITE</p>
+      <h1 data-reveal>关于本站</h1>
+    </div>
+
+    <div class="about__grid">
+      <div class="about__block reader">
+        <h2 data-reveal>这是怎么工作的</h2>
+        <p data-reveal>
+          本站在 GitHub Pages 上免费部署。静态站点由 Astro 构建，
+          三块内容由三条管道驱动：
+        </p>
+        <ul class="about__list">
+          <li data-reveal>
+            <span class="mono about__num">01</span>
+            <div>
+              <b>Agent 状态图</b>
+              <p>各 agent 会话结束/停止时，Stop hook 调用状态脚本写入 <code class="mono">public/live/status.json</code> 并静默推送；首页每约 90s 轮询 raw.githubusercontent.com 刷新。</p>
+            </div>
+          </li>
+          <li data-reveal>
+            <span class="mono about__num">02</span>
+            <div>
+              <b>wayfinder 进度图</b>
+              <p><code class="mono">generate-progress.mjs</code> 读取 <code class="mono">.scratch/</code> 下的地图与 ticket，生成 <code class="mono">progress.json</code> 提交构建。</p>
+            </div>
+          </li>
+          <li data-reveal>
+            <span class="mono about__num">03</span>
+            <div>
+              <b>Notion 随笔</b>
+              <p>在页面上选择 Notion 文章，经本地发布桥 + 标记转换后归档为 <code class="mono">src/content/essays/</code> 的 Markdown，随下次构建发布。</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="about__block reader">
+        <h2 data-reveal>技术栈</h2>
+        <ul class="about__tech">
+          <li class="mono" data-reveal>Astro 5 · Content Layer</li>
+          <li class="mono" data-reveal>d3-force · 2D Canvas</li>
+          <li class="mono" data-reveal>GitHub Actions · Pages</li>
+          <li class="mono" data-reveal>Notion API · notion-to-md</li>
+          <li class="mono" data-reveal>wayfinder · 本地 issue tracker</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .section__head { margin-bottom: 2.4rem; display: grid; gap: .35rem; }
+  .section__head .mono { color: var(--ink-faint); letter-spacing: var(--track-meta); margin: 0; }
+  .section__head h1 { margin: 0; }
+  .about__grid { display: grid; gap: 3.4rem; }
+  .about__block h2 { margin: 0 0 1.2rem; }
+  .about__block > p { color: var(--ink-soft); }
+  .about__list { list-style: none; margin: 1.6rem 0 0; padding: 0; display: grid; gap: 1.6rem; }
+  .about__list li { display: grid; grid-template-columns: 2.6rem 1fr; gap: 1rem; }
+  .about__num { color: var(--ink-faint); padding-top: .15rem; }
+  .about__list b { display: block; margin-bottom: .3rem; }
+  .about__list p { margin: 0; color: var(--ink-soft); font-size: var(--step--1); line-height: 1.7; }
+  .about__list code { font-family: var(--font-mono); font-size: .85em; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 4px; padding: .05em .35em; }
+  .about__tech { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem .6rem; }
+  .about__tech li { color: var(--ink-soft); font-size: var(--step--1); border: 1px solid var(--hairline); border-radius: 6px; padding: .4em .8em; background: var(--surface); }
+</style>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- AICD 硬朗纸面底 + 双子星座节点：ink 主节点 · amber 工作中 -->
+  <rect width="64" height="64" fill="#eaeae8"/>
+  <g stroke="#1a1a19" stroke-width="2">
+    <line x1="22" y1="26" x2="42" y2="38"/>
+  </g>
+  <circle cx="22" cy="26" r="9" fill="#1a1a19"/>
+  <circle cx="22" cy="26" r="3" fill="#eaeae8"/>
+  <circle cx="42" cy="38" r="6" fill="#b07a33"/>
+  <circle cx="42" cy="38" r="2" fill="#eaeae8"/>
+</svg>

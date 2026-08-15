@@ -1,0 +1,222 @@
+{
+  "schema": "1.0",
+  "updated_at": "2026-08-15T12:40:49.201Z",
+  "generator": "generate-progress.mjs",
+  "note": "wayfinder 决策图谱；effort/ticket/Blocked by 直读 .scratch 生成",
+  "efforts": [
+    {
+      "id": "personal-website",
+      "title": "个人网站（Personal Website）",
+      "destination": "交付一条可在 GitHub 上免费部署个人网站的完整路线：视觉沿用 The AI Coding Dictionary 的「冷峻纸面 + 漂浮星座」硬朗风格（2 主色 + color-mix 派生、双字体角色、流体排版、expo 缓动 + 52ms 级联）；首页以图/节点实时呈现 agent 工作状态与开发进度（首期 Claude + pi，Codex 后续按同一契约接入）；随笔文章从 Notion 经 MCP + HTML/Markdown 转换后归档展示，并支持在网页中自行选择要上传的文章。到达终点时：所有开发前必须锁定的决策都已在本图的 ticket 中解决，路线清晰，可直接照图实施。",
+      "decisions": [
+        {
+          "id": "02-notion-pipeline-research",
+          "title": "02-notion-pipeline-research",
+          "gist": "官方 Notion MCP 已发布但只出 block JSON；转换链用 @notionhq/client + notion-to-md@3.1.9（turndown 仅 HTML 中间产物时用）；日常 agent 按需经 MCP 导出 push，CI cron + NOTION_TOKEN 为可选兜底（防 60 天停 cron）；Astro essays collection 接 title/date/tags/draft/slug。"
+        },
+        {
+          "id": "04-stack-research",
+          "title": "Stack 研究",
+          "gist": "技术栈 = Astro 静态输出 + Content Layer(glob loader 读 markdown) + 客户端 d3-force island；部署 = withastro/action → actions/deploy-pages 产物流；状态 JSON 入仓库、客户端轮询 raw（约 5 分钟缓存地板）"
+        },
+        {
+          "id": "01-free-hosting-realtime-research",
+          "title": "01-free-hosting-realtime-research",
+          "gist": "状态走「客户端轮询 raw 的 status.json」：raw 边缘按路径缓存 5 分钟且 ?ts= 无效（实测）、匿名限速 ~60/hr/IP、fetch 勿加自定义头；Actions 重建只用于内容改版并靠 paths: 白名单与状态 push 解耦；亚分钟需另迁 CF/Netlify（可选，非默认）"
+        },
+        {
+          "id": "03-graph-viz-research",
+          "title": "03-graph-viz-research",
+          "gist": "图 = 2D Canvas + d3-force（数百节点 60fps 舒适区），不引 three/R3F（380KB gzip + a11y 难）；标签 fillText + 阈值 LOD；hover 邻接高亮其余变暗、点击右侧抽屉让位、正弦浮动+20帧环形缓冲彗星尾迹；reduced-motion 一行 matchMedia 关动画；canvas 需 HTML 平行路径（抽屉/列表/aria）。修正：原站并无 drei，是自定义 useFrame + sprite 标签"
+        },
+        {
+          "id": "08-graph-model",
+          "title": "08-graph-model",
+          "gist": "首页 Agent 图 = agent+当前任务两级（双子星座，状态着色+脉冲）；/progress 图 = 对接 wayfinder（effort=项目、ticket=任务、Blocked by=边、Status=状态）；状态机 agent 四态/任务四态；抽屉摘要+详情混合。数据契约要求 07 状态含 current_task 字段"
+        },
+        {
+          "id": "05-site-naming",
+          "title": "站点命名与身份",
+          "gist": "工作名「Agent Workspace」，口号「Claude · pi · Codex — 工作状态与开发进度的实时图谱」；纸 #eaeae8 / 墨 #1a1a19，工作状态琥珀 #b07a33；命名集中 site.ts 单点"
+        },
+        {
+          "id": "06-design-system",
+          "title": "设计系统落地",
+          "gist": "AICD 配方已落 src/styles/global.css：双主色 + color-mix、双字体角色、流体排版、expo 缓动 + 52ms 级联、逐词加载屏、scaleX 分割线、0.62s 抽屉、reduced-motion 一键关"
+        },
+        {
+          "id": "07-agent-status-pipeline",
+          "title": "Agent 状态管道落地",
+          "gist": "契约落 src/lib/status.js；上报统一 scripts/sync-status.mjs + Claude Code Stop hook；页面 90s 轮询 raw（≈5min 缓存地板）+ 同源回退，no-store 无自定义头，退避封顶 10min；样例 public/live/status.json"
+        },
+        {
+          "id": "09-notion-pipeline",
+          "title": "文章管道落地",
+          "gist": "COLUMN_MAP 映射库字段；front-matter 对齐 essays collection；@notionhq/client + notion-to-md@3.1.9；入口 scripts/notion-publish.mjs；正文页即网页版"
+        },
+        {
+          "id": "10-site-ia-templates",
+          "title": "站点 IA 与模板",
+          "gist": "页面：/、/progress、/essays、/essays/[slug]、/about、/404、/rss.xml；Base.astro 顶栏/加载屏/og/canonical；base 统一走 site.ts 规范化"
+        },
+        {
+          "id": "12-global-review-gate",
+          "title": "发布前全局审查门",
+          "gist": "已过门：base 尾斜杠修复、token 全扫干净、raw 滥用边界达标、reduced-motion + aria、perf(DPR≤2/LOD)、SEO/OG 正确"
+        },
+        {
+          "id": "13-publish-in-page-select",
+          "title": "网页内自选文章上传",
+          "gist": "落地本地发布桥 scripts/publish-bridge.mjs（AICD web UI + 本地服务，勾选→转 Markdown→推送）；token 仅本地/CI secret，公开站不直连 Notion"
+        },
+        {
+          "id": "14-progress-graph-data",
+          "title": "进度图数据生成",
+          "gist": "scripts/generate-progress.mjs 直读 .scratch 生成 public/progress.json（schema 1.0）；effort/ticket/Blocked by/Status → 节点/边/状态机"
+        }
+      ],
+      "tickets": [
+        {
+          "id": "01",
+          "file": "issues/01-free-hosting-realtime-research.md",
+          "title": "在免费 GitHub Pages（无后端、无 serverless）上为本站提供「近实时」agent 状态，推荐采用哪种机制？需要验证：raw.githubusercontent.com 浏览器直取 JSON 的 CORS / 缓存 / 速率边界；GitHub Actions 重建的延迟与当前官方部署流程（configure-pages / upload-pages-artifact / deploy-pages）；第三方免费实时通道的取舍；以及「页面轮询 vs 提交重建」的分工。",
+          "type": "research",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "在免费 GitHub Pages（无后端、无 serverless）上为本站提供「近实时」agent 状态，推荐采用哪种机制？需要验证：raw.githubusercontent.com 浏览器直取 JSON 的 CORS / 缓存 / 速率边界；GitHub Actions 重建的延迟与当前官方部署流程（configure-pages / upload-pages-artifact / deploy-pages）；第三方免费实时通道的取舍；以及「页面轮询 vs 提交重建」的分工。",
+          "answer": "推荐方案 A（客户端轮询 raw.githubusercontent.com 的 status.json）为主通道；方案 B（Actions 重建）只用于网站本体真实内容改版，不承载状态更新。轮询 60–120s，有效新鲜度 ≤5 分钟（实测）——这是纯 GitHub 免费静态托管不引 serverless 的现实上限，「秒级」做不到。"
+        },
+        {
+          "id": "02",
+          "file": "issues/02-notion-pipeline-research.md",
+          "title": "把 Notion 页面变成静态站随笔归档，2026-08 时的最佳管道？用户要「接入 Notion MCP」。需要验证：官方 Notion MCP server 的设置与现状；页面 block → 干净 Markdown 的工具链（官方 API + notion-to-md 等，以及其中 HTML→Markdown 的环节）；CI 定时用 NOTION_TOKEN 拉取 vs 本地脚本 + MCP 导出 vs 混合；front-matter / 内容集合（Astro 等）的适配。",
+          "type": "research",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "把 Notion 页面变成静态站随笔归档，2026-08 时的最佳管道？用户要「接入 Notion MCP」。需要验证：官方 Notion MCP server 的设置与现状；页面 block → 干净 Markdown 的工具链（官方 API + notion-to-md 等，以及其中 HTML→Markdown 的环节）；CI 定时用 NOTION_TOKEN 拉取 vs 本地脚本 + MCP 导出 vs 混合；front-matter / 内容集合（Astro 等）的适配。",
+          "answer": "推荐管道（详见研究输出的「结论/推荐」）："
+        },
+        {
+          "id": "03",
+          "file": "issues/03-graph-viz-research.md",
+          "title": "在静态页上复刻 AICD 的「漂浮星座」图（原站 three.js + react-three-fiber + drei + d3-force，约 69 节点），本站 ≤ 数百节点时的取舍：2D d3-force（SVG / Canvas）vs 3D three.js / R3F；标签渲染方式（canvas 内文字 vs HTML overlay vs SVG）；交互（hover 邻接高亮、点击滑出抽屉、彗星尾迹、平移缩放）；移动端与 reduced-motion 兼容；vanilla JS vs React 封装。",
+          "type": "research",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "在静态页上复刻 AICD 的「漂浮星座」图（原站 three.js + react-three-fiber + drei + d3-force，约 69 节点），本站 ≤ 数百节点时的取舍：2D d3-force（SVG / Canvas）vs 3D three.js / R3F；标签渲染方式（canvas 内文字 vs HTML overlay vs SVG）；交互（hover 邻接高亮、点击滑出抽屉、彗星尾迹、平移缩放）；移动端与 reduced-motion 兼容；vanilla JS vs React 封装。",
+          "answer": "（结论见下。研究日期 2026-08-15；库版本/体积均实测或核验。）"
+        },
+        {
+          "id": "04",
+          "file": "issues/04-stack-research.md",
+          "title": "针对本 spec（中文个人站 / GitHub Pages 免费托管 / CSS 优先的硬朗设计语言 / markdown 随笔内容集合 / 客户端力导向图 island / 实时状态）的静态技术栈推荐：Astro vs Vite+框架 vs 11ty vs 手写生成器；以及 Pages 部署动作（actions/deploy-pages 等）与内容集合策略。",
+          "type": "research",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "针对本 spec（中文个人站 / GitHub Pages 免费托管 / CSS 优先的硬朗设计语言 / markdown 随笔内容集合 / 客户端力导向图 island / 实时状态）的静态技术栈推荐：Astro vs Vite+框架 vs 11ty vs 手写生成器；以及 Pages 部署动作（actions/deploy-pages 等）与内容集合策略。",
+          "answer": "（完整依据见研究返回，含来源 URL。结论摘要如下。）"
+        },
+        {
+          "id": "05",
+          "file": "issues/05-site-naming.md",
+          "title": "本站叫什么名字、用什么口号/副标题、强调色选什么？（硬朗冷峻基调已定；命名与视觉身份属用户口味。）调研文章 House Style 可作候选参考。",
+          "type": "grilling",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "本站叫什么名字、用什么口号/副标题、强调色选什么？（硬朗冷峻基调已定；命名与视觉身份属用户口味。）调研文章 House Style 可作候选参考。",
+          "answer": "工作名采用「Agent Workspace」，口号「Claude · pi · Codex — 工作状态与开发进度的实时图谱」；纸 #eaeae8 / 墨 #1a1a19 双主色，状态色琥珀 #b07a33（工作）。命名集中在 src/lib/site.ts 单点，正式命名后续可替换。"
+        },
+        {
+          "id": "06",
+          "file": "issues/06-design-system.md",
+          "title": "如何把 AICD 设计配方落地为本站设计系统？范围：设计令牌（2 主色 + color-mix 派生 + 1 强调色）、双字体角色（无衬线表达 + 等宽元信息 + 中文栈）、流体排版、动效配方（expo 缓动、52ms 级联、逐词加载屏、scaleX 分割线、抽屉 0.62s 滑入 + 画布让位）、组件（顶栏、加载屏、抽屉、卡片、callout、表格、状态徽标）、暗色模式、reduced-motion、可访问性。产出作为网站 spec 的视觉部分。",
+          "type": "prototype",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "如何把 AICD 设计配方落地为本站设计系统？范围：设计令牌（2 主色 + color-mix 派生 + 1 强调色）、双字体角色（无衬线表达 + 等宽元信息 + 中文栈）、流体排版、动效配方（expo 缓动、52ms 级联、逐词加载屏、scaleX 分割线、抽屉 0.62s 滑入 + 画布让位）、组件（顶栏、加载屏、抽屉、卡片、callout、表格、状态徽标）、暗色模式、reduced-motion、可访问性。产出作为网站 spec 的视觉部分。",
+          "answer": "已在 src/styles/global.css 落地 AICD 配方：paper/ink 双主色 + color-mix 派生、双字体角色（无衬线表达 + 等宽元信息 + 中文栈）、流体排版 clamp、expo 缓动 + 52ms 级联、逐词加载屏、scaleX 分割线、0.62s 抽屉滑入、vignette、reduced-motion 一键关闭。组件：顶栏/加载屏/抽屉/卡片/状态徽标/表格。"
+        },
+        {
+          "id": "07",
+          "file": "issues/07-agent-status-pipeline.md",
+          "title": "Agent（Claude / Codex / PI）的工作状态如何进入网站？要定：状态 JSON 契约（live.json + 每次 run 的记录 + 心跳）、上报机制（统一 sync-status 脚本 + 各 agent 会话收尾调用 / Claude Code Stop hook / 手动）、「页面轮询 raw.githubusercontent」与「Actions 提交重建」的分工、失败与超时处理、防泄露（不写 token/secret 进公开仓库）。",
+          "type": "prototype",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "Agent（Claude / Codex / PI）的工作状态如何进入网站？要定：状态 JSON 契约（live.json + 每次 run 的记录 + 心跳）、上报机制（统一 sync-status 脚本 + 各 agent 会话收尾调用 / Claude Code Stop hook / 手动）、「页面轮询 raw.githubusercontent」与「Actions 提交重建」的分工、失败与超时处理、防泄露（不写 token/secret 进公开仓库）。",
+          "answer": "契约落 src/lib/status.js：agent 四态(idle/working/blocked/error) + current_task + task_status(pending/in-progress/blocked/resolved)。上报统一 scripts/sync-status.mjs，Claude Code Stop hook 收尾调用；页面 90s 轮询 raw.githubusercontent（约 5 分钟缓存地板）→ 同源 /live/status.json 回退，fetch cache:no-store 且不加自定义头（防预检 403），指数退避封顶 10min。防泄露：无 token/路径/PII 进公开 JSON。样例 public/live/status.json。"
+        },
+        {
+          "id": "08",
+          "file": "issues/08-graph-model.md",
+          "title": "图谱/节点展示的语义模型：首页 Agent 状态图（节点 = agent/当前任务，状态着色 + 脉冲）与 /progress 开发进度图（节点 = 项目/任务，边 = 依赖/执行链）是否分置？节点的状态机（pending / in-progress / blocked / done 等）、点击 → 抽屉详情、hover 邻接高亮、与「Agent 状态管道」的数据形状对齐。",
+          "type": "grilling",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "图谱/节点展示的语义模型：首页 Agent 状态图（节点 = agent/当前任务，状态着色 + 脉冲）与 /progress 开发进度图（节点 = 项目/任务，边 = 依赖/执行链）是否分置？节点的状态机（pending / in-progress / blocked / done 等）、点击 → 抽屉详情、hover 邻接高亮、与「Agent 状态管道」的数据形状对齐。",
+          "answer": "四叉全部确认（用户 grilling 决策，2026-08-15）。渲染配方已由 03-graph-viz-research 定死（2D Canvas + d3-force、hover 邻接高亮、点击右侧抽屉让位、彗星尾迹、reduced-motion）。本决议只定语义："
+        },
+        {
+          "id": "09",
+          "file": "issues/09-notion-pipeline.md",
+          "title": "文章管道落地：Notion 随笔库的数据库结构（字段）、front-matter schema（标题/日期/标签/slug）、block → Markdown 转换脚本、同步触发（CI 定时 vs 本地 MCP 导出推送）、随笔正文页的阅读版式要求（遵循「交付需网页版」长期决策，正文页即网页版）。产出文章管道的规格与脚本清单。",
+          "type": "task",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "文章管道落地：Notion 随笔库的数据库结构（字段）、front-matter schema（标题/日期/标签/slug）、block → Markdown 转换脚本、同步触发（CI 定时 vs 本地 MCP 导出推送）、随笔正文页的阅读版式要求（遵循「交付需网页版」长期决策，正文页即网页版）。产出文章管道的规格与脚本清单。",
+          "answer": "落地：COLUMN_MAP 映射 Notion 库字段(title/日期/Tags/摘要/Published/Slug)；front-matter schema(title/date/tags/excerpt/draft/slug/source) 与 essays collection 对齐；转换链 @notionhq/client + notion-to-md@3.1.9；入口 scripts/notion-publish.mjs(--list/--all/--page/--force/--slug/--commit)。随笔正文页即网页版（遵循「交付需网页版」长期决策）。"
+        },
+        {
+          "id": "10",
+          "file": "issues/10-site-ia-templates.md",
+          "title": "站点信息架构与页面模板：页面清单（首页 / 开发进度 / 随笔 / 关于 / 404）、导航（等宽大写元信息 + 顶栏）、首页（hero + 逐词加载屏 + 状态图）、进度页、随笔列表、随笔正文、关于页。产出站点结构骨架与模板清单。",
+          "type": "prototype",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "站点信息架构与页面模板：页面清单（首页 / 开发进度 / 随笔 / 关于 / 404）、导航（等宽大写元信息 + 顶栏）、首页（hero + 逐词加载屏 + 状态图）、进度页、随笔列表、随笔正文、关于页。产出站点结构骨架与模板清单。",
+          "answer": "页面清单落地：/（hero + 状态图 + 最新随笔）、/progress、/essays、/essays/[slug]、/about、/404、/rss.xml。Base.astro 提供顶栏导航、逐词加载屏、og/canonical/icon；base 前缀统一走 src/lib/site.ts（结尾带 / 规范化）。移动端适配与 reduced-motion 就绪。"
+        },
+        {
+          "id": "11",
+          "file": "issues/11-repo-pages-setup.md",
+          "title": "落地部署前置：创建 GitHub 仓库、开启 Pages、编写 Actions workflow（build + deploy）、配置 secrets（NOTION_TOKEN 等）、仓库目录结构（content/、status/、src/）。需要用户 GitHub 账号的授权与仓库创建动作。",
+          "type": "task",
+          "status": "open",
+          "blocked_by": [],
+          "question": "落地部署前置：创建 GitHub 仓库、开启 Pages、编写 Actions workflow（build + deploy）、配置 secrets（NOTION_TOKEN 等）、仓库目录结构（content/、status/、src/）。需要用户 GitHub 账号的授权与仓库创建动作。",
+          "answer": ""
+        },
+        {
+          "id": "12",
+          "file": "issues/12-global-review-gate.md",
+          "title": "发布前的全局严谨审查门：设计一致性（token/排版/动效是否统一）、隐私与安全（公开数据面最小化、无 token/key 泄漏、GitHub raw/API 滥用边界）、可访问性（键盘/阅读器/reduced-motion）、性能（图在移动端帧率、包体）、SEO/OG。通过后才视为到达 Destination。",
+          "type": "task",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "发布前的全局严谨审查门：设计一致性（token/排版/动效是否统一）、隐私与安全（公开数据面最小化、无 token/key 泄漏、GitHub raw/API 滥用边界）、可访问性（键盘/阅读器/reduced-motion）、性能（图在移动端帧率、包体）、SEO/OG。通过后才视为到达 Destination。",
+          "answer": "已过门（2026-08-15）：base 前缀尾斜杠修复（/personal-site/essays/… 均正确）；token 泄漏全扫干净（src/public/scripts/dist 无 ntn_/secret/ghp_）；raw 滥用边界达标（no-store、无自定义头、退避）；a11y（reduced-motion JS matchMedia + CSS 全局关动画、drawer Esc/关闭钮/aria-label）；perf（DPR≤2、标签 fillText + LOD、纯静态）；SEO/OG（canonical/og:image/rss 链接正确）。"
+        },
+        {
+          "id": "13",
+          "file": "issues/13-publish-in-page-select.md",
+          "title": "用户要在「网页中自行选择 Notion 文章上传」——即在浏览器界面里浏览 Notion 文章库、勾选要发布的文章、触发转换并上传归档到网站。这是静态 GitHub Pages 上最敏感的决策，因为公开页面无法安全持有 Notion token。要定：机制（候选 A：本地「发布桥」——用户机器上跑一个小型本地服务（同款 AICD 设计语言的 web UI），经 Notion MCP/API 拉取库 → 勾选 → 转 Markdown → 提交推送 → 触发构建；候选 B：公开站直接连 Notion API，需评估 token 泄露风险，预期否决；候选 C：GitHub Actions workflow_dispatch 传参选择，交互在 GitHub 侧而非网站内）；token 只在本地/CI secret 的边界；与 CI 全自动同步的关系（混合）。",
+          "type": "prototype",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "用户要在「网页中自行选择 Notion 文章上传」——即在浏览器界面里浏览 Notion 文章库、勾选要发布的文章、触发转换并上传归档到网站。这是静态 GitHub Pages 上最敏感的决策，因为公开页面无法安全持有 Notion token。要定：机制（候选 A：本地「发布桥」——用户机器上跑一个小型本地服务（同款 AICD 设计语言的 web UI），经 Notion MCP/API 拉取库 → 勾选 → 转 Markdown → 提交推送 → 触发构建；候选 B：公开站直接连 Notion API，需评估 token 泄露风险，预期否决；候选 C：GitHub Actions workflow_dispatch 传参选择，交互在 GitHub 侧而非网站内）；token 只在本地/CI secret 的边界；与 CI 全自动同步的关系（混合）。",
+          "answer": "落地本地「发布桥」scripts/publish-bridge.mjs：本地 HTTP 服务 + 同款 AICD web UI（GET / 列表勾选、GET /api/pages、POST /api/publish 转 Markdown 写 src/content/essays 并可选 git push）。token 仅本地 .env.local / CI secret，公开站不直连 Notion API，杜绝 token 进公开面。"
+        },
+        {
+          "id": "14",
+          "file": "issues/14-progress-graph-data.md",
+          "title": "/progress 图的数据生成：把 wayfinder 地图/ticket 结构转换成网站可消费的进度图 JSON。要定：解析范围与规则（读 `.scratch/<effort>/map.md` 与 `issues/*.md`：effort → 项目节点，ticket → 任务节点，`Blocked by:` 行 → 依赖边，`Status:` 行 → 状态）；输出 schema（与 08-graph-model 决议的节点/边/状态机对齐）；生成物落库路径（如 `progress.json`，随 07 状态管道的 push/轮询机制同步）；触发方式（session 收尾统一脚本 or 单独脚本）。产出生成脚本规格与进度图 JSON schema。",
+          "type": "task",
+          "status": "resolved",
+          "blocked_by": [],
+          "question": "/progress 图的数据生成：把 wayfinder 地图/ticket 结构转换成网站可消费的进度图 JSON。要定：解析范围与规则（读 `.scratch/<effort>/map.md` 与 `issues/*.md`：effort → 项目节点，ticket → 任务节点，`Blocked by:` 行 → 依赖边，`Status:` 行 → 状态）；输出 schema（与 08-graph-model 决议的节点/边/状态机对齐）；生成物落库路径（如 `progress.json`，随 07 状态管道的 push/轮询机制同步）；触发方式（session 收尾统一脚本 or 单独脚本）。产出生成脚本规格与进度图 JSON schema。",
+          "answer": "scripts/generate-progress.mjs 直读 .scratch/<effort>/map.md 与 issues/*.md：effort→项目节点、ticket→任务节点、Blocked by:→依赖边、Status:→状态，输出 public/progress.json（schema 1.0）；节点状态机 pending/in-progress/blocked/resolved 与 08-graph-model 对齐。"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+---
+import Base from '../layouts/Base.astro';
+import { base } from '../lib/site';
+---
+
+<Base title="404" description="页面不存在" active="">
+  <section class="container section notfound">
+    <p class="mono notfound__code" data-reveal>404 / NOT FOUND</p>
+    <h1 data-reveal>迷路了</h1>
+    <p class="notfound__lede" data-reveal>这个页面不存在，或已被移动。</p>
+    <a class="btn" href={`${base}`} data-reveal>回到首页 <span aria-hidden="true">→</span></a>
+  </section>
+</Base>
+
+<style>
+  .notfound { padding-block: clamp(5rem, 14vw, 11rem); display: grid; justify-items: start; gap: .6rem; }
+  .notfound__code { color: var(--ink-faint); letter-spacing: var(--track-meta); margin: 0; }
+  .notfound h1 { font-size: var(--step-4); margin: 0; letter-spacing: var(--track-display); }
+  .notfound__lede { color: var(--ink-soft); margin: 0 0 1.4rem; }
+</style>

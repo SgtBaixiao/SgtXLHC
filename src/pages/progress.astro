@@ -1,0 +1,58 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE, base } from '../lib/site';
+---
+
+<Base title="进度" description={`wayfinder 决策图谱 — ${SITE.description}`} active="/progress">
+  <section class="container section section--tight">
+    <div class="section__head">
+      <p class="mono" data-reveal>WAYFINDER / PROGRESS</p>
+      <h1 data-reveal>开发进度</h1>
+      <p class="progress__lede" data-reveal>
+        effort 是主节点，其下每个 ticket 是子节点；虚线表示「Blocked by」阻塞关系。
+        点击节点查看类型、状态、问题与答案。数据由 <code class="mono">generate-progress.mjs</code>
+        从 <code class="mono">.scratch/</code> 生成。
+      </p>
+    </div>
+
+    <div class="stage drawer-shell" data-graph-shell>
+      <div class="drawer-shell__main">
+        <canvas class="stage__canvas" data-progress-graph aria-label="wayfinder 开发进度图"></canvas>
+        <div class="stage__empty" data-graph-empty hidden>
+          <p class="mono">NO PROGRESS DATA</p>
+          <p class="mono stage__empty-sub">尚未生成 progress.json — 运行 <span class="mono">npm run progress</span></p>
+        </div>
+      </div>
+      <aside class="drawer" data-graph-drawer aria-label="ticket 详情" role="complementary">
+        <button class="drawer__close mono" data-drawer-close type="button" aria-label="关闭详情">✕</button>
+        <div class="drawer__body"></div>
+      </aside>
+    </div>
+
+    <div class="stage__legend mono">
+      <span class="chip"><i style="background:var(--st-in-progress)"></i>进行中</span>
+      <span class="chip"><i style="background:var(--st-pending)"></i>待办</span>
+      <span class="chip"><i style="background:var(--st-resolved)"></i>已解决</span>
+      <span class="chip"><i class="chip--square" style="background:var(--ink-faint)"></i>阻塞边</span>
+    </div>
+    <p class="mono stage__hint" data-progress-meta>加载中…</p>
+  </section>
+</Base>
+
+<style>
+  .section__head { margin-bottom: 2.4rem; display: grid; gap: .35rem; }
+  .section__head .mono { color: var(--ink-faint); letter-spacing: var(--track-meta); margin: 0; }
+  .section__head h1 { margin: 0; }
+  .progress__lede { max-width: 40rem; color: var(--ink-soft); margin-top: .8rem; }
+  .progress__lede code { font-family: var(--font-mono); font-size: .85em; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 4px; padding: .05em .4em; }
+  .stage { margin-bottom: 1rem; }
+  .stage__empty-sub { margin: .4rem 0 0; color: var(--ink-ghost); font-size: var(--step--1); text-transform: none; }
+  .stage__legend { display: flex; flex-wrap: wrap; gap: .4rem 1.6rem; margin-bottom: .6rem; color: var(--ink-faint); }
+  .stage__hint { color: var(--ink-faint); font-size: var(--step--1); margin: 0; letter-spacing: var(--track-meta); }
+  .chip--square { border-radius: 0; width: 7px; height: 7px; }
+</style>
+
+<script>
+  import { initProgressGraph } from '../components/ProgressGraph.js';
+  initProgressGraph();
+</script>
