@@ -1,0 +1,254 @@
+<title>连接 Notion 指南</title>
+<style>
+  :root {
+    --paper: #eaeae8;
+    --paper-2: #f4f2ef;
+    --ink: #1a1a19;
+    --ink-2: #46463f;
+    --ink-3: #77776e;
+    --hairline: #c9c4b8;
+    --accent: #c8412b;
+    --accent-ink: #8f2415;
+    --code-bg: #e0ded8;
+    --blockquote: #d6d2c8;
+    --chip: #dcd9d0;
+    --ok: #5e7a54;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  :root[data-theme="dark"] {
+    --paper: #1a1a19;
+    --paper-2: #21211f;
+    --ink: #eaeae8;
+    --ink-2: #c2c2ba;
+    --ink-3: #8a8a82;
+    --hairline: #3a3a35;
+    --accent: #e4634a;
+    --accent-ink: #ff9d88;
+    --code-bg: #262624;
+    --blockquote: #33332f;
+    --chip: #2e2e2a;
+    --ok: #8fae82;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    font-size: 17px;
+    transition: background .3s var(--ease-out), color .3s var(--ease-out);
+  }
+  ::selection { background: var(--accent); color: var(--paper); }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem clamp(1.2rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--hairline);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .topbar__brand { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .78rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink); text-decoration: none; }
+  .topbar__brand em { font-style: normal; color: var(--accent); }
+  .theme-toggle {
+    font: inherit; font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .72rem; letter-spacing: .12em;
+    background: transparent; color: var(--ink-2); border: 1px solid var(--hairline);
+    padding: .3rem .7rem; cursor: pointer; border-radius: 2px;
+    transition: color .2s var(--ease-out), border-color .2s var(--ease-out);
+  }
+  .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+  .hero { padding: clamp(3.5rem, 9vw, 6.5rem) clamp(1.2rem, 6vw, 4.5rem) clamp(2.5rem, 6vw, 4rem); }
+  .hero__kicker { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .78rem; letter-spacing: .22em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.1rem; }
+  .hero h1 { font-size: clamp(2.2rem, 6.5vw, 4rem); line-height: 1.06; letter-spacing: -0.02em; font-weight: 650; margin-bottom: 1.2rem; }
+  .hero h1 .soft { color: var(--ink-3); font-weight: 500; }
+  .hero__lede { max-width: 42rem; color: var(--ink-2); font-size: clamp(1rem, 1.8vw, 1.15rem); }
+  .hero__lede strong { color: var(--accent-ink); font-weight: 650; }
+  .hero__meta { margin-top: 1.8rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+  .chip {
+    font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .72rem; letter-spacing: .1em;
+    background: var(--chip); color: var(--ink-2); padding: .32rem .7rem; border-radius: 3px;
+  }
+
+  .article { max-width: 46rem; margin: 0 auto; padding: 0 clamp(1.2rem, 6vw, 3rem) 5rem; }
+  .article h2 {
+    font-size: clamp(1.3rem, 2.6vw, 1.6rem); letter-spacing: -0.015em; font-weight: 650;
+    margin: 3.2rem 0 1rem; padding-top: 1.6rem; border-top: 1px solid var(--hairline);
+    scroll-margin-top: 5rem;
+  }
+  .article h2 .no { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; color: var(--accent); font-size: .72em; letter-spacing: .1em; margin-right: .6rem; }
+  .article h3 { font-size: 1.08rem; font-weight: 650; margin: 1.8rem 0 .6rem; }
+  .article p { color: var(--ink-2); margin-bottom: 1rem; }
+  .article strong { color: var(--ink); font-weight: 650; }
+  .article a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  .article a:hover { border-color: var(--accent); }
+
+  .article ol { counter-reset: step; list-style: none; margin: 1.2rem 0 1.4rem; padding: 0; }
+  .article ol > li {
+    counter-increment: step; position: relative;
+    padding: 1.1rem 1.2rem 1.1rem 3.4rem; margin-bottom: .8rem;
+    background: var(--paper-2); border: 1px solid var(--hairline); border-radius: 4px;
+    color: var(--ink-2);
+  }
+  .article ol > li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute; left: 1.05rem; top: 1.15rem;
+    font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .72rem; color: var(--accent);
+    letter-spacing: .06em;
+  }
+  .article ol > li strong { display: block; color: var(--ink); margin-bottom: .15rem; }
+
+  .article ul { list-style: none; margin: 0 0 1.2rem; padding: 0; }
+  .article ul > li { position: relative; padding-left: 1.3rem; color: var(--ink-2); margin-bottom: .5rem; }
+  .article ul > li::before {
+    content: ""; position: absolute; left: .15rem; top: .72em;
+    width: 6px; height: 6px; transform: rotate(45deg);
+    background: var(--accent);
+  }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.4rem; font-size: .92rem; }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--hairline); color: var(--ink-2); }
+  th { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+  td code { font-size: .9em; }
+  tr:last-child td { border-bottom: none; }
+
+  code {
+    font-family: "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    font-size: .86em; background: var(--code-bg); color: var(--ink);
+    padding: .12em .38em; border-radius: 3px;
+  }
+  pre {
+    background: var(--ink); color: var(--paper);
+    padding: 1.1rem 1.3rem; border-radius: 4px; overflow-x: auto;
+    margin: 1rem 0 1.3rem; line-height: 1.6; font-size: .84rem;
+  }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: 1em; }
+
+  blockquote {
+    border-left: 3px solid var(--accent); background: var(--blockquote);
+    padding: .9rem 1.2rem; border-radius: 0 4px 4px 0; margin: 1.2rem 0 1.4rem;
+    color: var(--ink-2); font-size: .95rem;
+  }
+  blockquote p { margin: 0; }
+  blockquote.ok { border-left-color: var(--ok); }
+
+  .divider {
+    height: 1px; background: linear-gradient(90deg, var(--accent), transparent);
+    margin: 0 clamp(1.2rem, 6vw, 3rem) 3.5rem;
+    transform-origin: left; animation: grow .8s var(--ease-out) both;
+  }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  footer { padding: 2.5rem clamp(1.2rem, 6vw, 3rem) 4rem; border-top: 1px solid var(--hairline); }
+  footer p { font-family: "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: .74rem; letter-spacing: .14em; color: var(--ink-3); text-transform: uppercase; max-width: 46rem; margin: 0 auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .001s !important; transition-duration: .001s !important; }
+  }
+  @media (max-width: 560px) {
+    .article ol > li { padding-left: 2.8rem; }
+  }
+</style>
+
+<header class="topbar">
+  <a class="topbar__brand" href="#">Agent <em>Workspace</em> · Notion 接入</a>
+  <button class="theme-toggle" id="themeBtn" type="button" aria-label="切换亮暗主题">☾ 主题</button>
+</header>
+
+<section class="hero">
+  <p class="hero__kicker">NOTION CONNECT GUIDE — 一次性操作</p>
+  <h1>把 Notion 接到网站<br>从 0 到第一篇随笔 <span class="soft">（约 5 分钟）</span></h1>
+  <p class="hero__lede"><strong>先记一条关键认知：Notion 的 token 不是「找」出来的，是「创建」出来的。</strong>它不会在设置里给你现成的 token——你必须去「集成管理」页新建一个集成，它才生成一个 token 给你复制。找不到 token，大概率就是还没创建集成。下面 6 步按顺序走。</p>
+  <div class="hero__meta">
+    <span class="chip">NOTION INTEGRATION</span>
+    <span class="chip">DATABASE ID</span>
+    <span class="chip">SHARE CONNECTION</span>
+    <span class="chip">≈ 5 MIN</span>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<article class="article">
+  <h2 id="token"><span class="no">01</span>创建集成，拿到 token</h2>
+  <ol>
+    <li><strong>打开集成管理</strong>Notion 左下角 <code>Settings</code>（设置）→ <code>Connections</code>（连接）→ 右上角 <code>Develop or manage integrations</code>（开发或管理集成）。或直接访问 <code>notion.so/my-integrations</code>。</li>
+    <li><strong>新建集成</strong>点 <code>+ New integration</code>，名称随便填（如 <code>personal-site</code>）。<strong>Workspace 下拉必须选对</strong>——存放随笔数据库的那个工作区。</li>
+    <li><strong>最小权限</strong>Capabilities 只勾 <code>Read content</code>（读取内容），其余全关。这是本项目的安全要求。</li>
+    <li><strong>复制 token</strong>Submit 后页面上出现 <strong>Internal Integration Token</strong>——这就是你的 <code>NOTION_TOKEN</code>，形如 <code>ntn_</code> 开头（旧格式 <code>secret_</code>，代码两者都认）。</li>
+    <li><strong>立刻存好</strong>只显示这一次，关掉页面就看不到了；丢了只能重新生成。</li>
+  </ol>
+
+  <h2 id="dbid"><span class="no">02</span>找到数据库 ID</h2>
+  <p>打开随笔数据库页面，看浏览器地址栏：</p>
+  <pre><code>https://www.notion.so/&lt;工作区&gt;/&lt;数据库ID&gt;?v=...</code></pre>
+  <p><code>?</code> 前面那一长串 32 位字符就是 <code>database_id</code>。</p>
+
+  <h2 id="share"><span class="no">03</span>授权集成访问数据库（最容易漏的一步）</h2>
+  <p><strong>光有 token 不够</strong>——集成默认看不到任何页面，必须手动授权。漏了这步，token 再对也会报 <code>404 could not find database</code>。<strong>那不是 token 错，是没授权。</strong></p>
+  <ol>
+    <li><strong>打开数据库页面</strong>右上角 <code>...</code>（三个点）菜单 → <code>Connections</code>（连接）。</li>
+    <li><strong>添加集成</strong>搜索并选中刚创建的集成名（如 <code>personal-site</code>），确认列表里出现它。</li>
+  </ol>
+  <blockquote><p>这一步必须在<strong>数据库页面本身</strong>（能看到文章列表的那页）操作，不是在库里的某篇文章内页。</p></blockquote>
+
+  <h2 id="columns"><span class="no">04</span>建好字段（代码按固定列名读）</h2>
+  <p>项目代码 <code>scripts/lib/notion-core.mjs</code> 按固定列名读数据。给数据库建齐这几列，列名与类型都要对：</p>
+  <table>
+    <tr><th>列名</th><th>类型</th><th>说明</th></tr>
+    <tr><td><code>Name</code></td><td>title</td><td>文章标题（Notion 默认就有）</td></tr>
+    <tr><td><code>日期</code></td><td>date</td><td>发布日期，决定归档排序与 URL 前缀</td></tr>
+    <tr><td><code>Tags</code></td><td>multi_select</td><td>标签，可空</td></tr>
+    <tr><td><code>摘要</code></td><td>rich_text</td><td>列表页摘要，可空</td></tr>
+    <tr><td><code>Published</code></td><td>checkbox</td><td>勾上才会上传到网站</td></tr>
+    <tr><td><code>Slug</code></td><td>rich_text</td><td>URL 别名，可空；留空自动用标题生成</td></tr>
+  </table>
+
+  <h2 id="test"><span class="no">05</span>本地测试</h2>
+  <pre><code>cd personal-site
+# 把 token 写进 gitignored 的 .env.local（推荐，避免每次敲）
+# NOTION_TOKEN=ntn_xxx
+
+npm run notion:list -- --database &lt;db_id&gt;</code></pre>
+  <p>看到文章列表 = 第 01~04 步全部打通。接着发布：</p>
+  <pre><code># 发布全部已勾选 Published 的文章
+npm run notion:publish -- --database &lt;db_id&gt; --all</code></pre>
+  <p>发布后在 <code>src/content/essays/</code> 生成 Markdown。本机预览 <code>npm run dev</code> → 打开 <code>http://localhost:4321/essays</code>。满意后加 <code>--commit</code> 重跑，自动 git 提交推送，触发构建上线。</p>
+  <blockquote class="ok"><p>可选：想免命令行、在浏览器里勾选上传，用本地发布桥 —— <code>NOTION_TOKEN=ntn_... npm run bridge -- --database &lt;db_id&gt;</code>，打开 <code>http://localhost:4174</code>。</p></blockquote>
+
+  <h2 id="store"><span class="no">06</span>存好 token（两条路径，都不入库）</h2>
+  <ul>
+    <li><strong>本地</strong>：写进 <code>.env.local</code>（已在 <code>.gitignore</code>，绝不提交）。</li>
+    <li><strong>GitHub Actions（CI）</strong>：仓库 → Settings → Secrets and variables → Actions → <code>New repository secret</code> → 名字 <code>NOTION_TOKEN</code>，值粘贴 token。</li>
+  </ul>
+
+  <h2 id="security"><span class="no">07</span>安全边界（不能省）</h2>
+  <ul>
+    <li>token 是「钥匙」，能读写所有共享给该集成的页面 → 权限只开 <strong>Read content</strong>。</li>
+    <li><strong>绝不提交进 git</strong>（历史会永久保留已删的密钥，泄了只能轮换）。</li>
+    <li><code>ntn_</code> PAT <strong>1 年有效</strong> → 日历里设个续期提醒。</li>
+    <li>公开网站不直连 Notion：token 只在本机 / CI，网页只展示构建产物。</li>
+  </ul>
+</article>
+
+<footer>
+  <p>AGENT WORKSPACE — NOTION CONNECT GUIDE · 2026-08-15 · AICD HARD STYLE</p>
+</footer>
+
+<script>
+  const btn = document.getElementById('themeBtn');
+  const stored = localStorage.getItem('pw-theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const apply = (t) => {
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀ 主题' : '☾ 主题';
+  };
+  apply(stored || (prefersDark ? 'dark' : 'light'));
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('pw-theme', next);
+    apply(next);
+  });
+</script>
