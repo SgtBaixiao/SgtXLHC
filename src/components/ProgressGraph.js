@@ -12,6 +12,7 @@
  */
 import { createGraph } from '../lib/graph';
 import { statusColor, slugify, fetchFirst, startPolling } from '../lib/status';
+import { base } from '../lib/site';
 import { bindDrawer } from '../lib/drawer';
 
 const STATUS_LABEL = {
@@ -137,7 +138,7 @@ export function initProgressGraph() {
 
   let first = true;
   async function load() {
-    return fetchFirst(['/progress.json']);
+    return fetchFirst([`${base}progress.json`]);
   }
   async function refresh() {
     try {

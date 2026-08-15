@@ -8,11 +8,12 @@
  *
  * 拉取策略（01-free-hosting-realtime-research）：
  *  - 部署后首选 raw.githubusercontent（PUBLIC_GITHUB_REPO 注入），约 5 分钟缓存地板
- *  - 本地 dev/preview 回退同源 /live/status.json（构建时打包的最近一次状态）
+ *  - 本地 dev/preview 回退同源 <base>live/status.json（构建时打包的最近一次状态）
  *  - fetch 一律 { cache:'no-store' }，不加自定义头（防预检 403）
  *  - 轮询 90s 起 + 指数退避封顶 10min；匿名限速 ~60/hr
  */
 import { cssVar } from './graph';
+import { base } from './site';
 
 export const AGENT_STATUS = ['idle', 'working', 'blocked', 'error'];
 export const TASK_STATUS = ['pending', 'in-progress', 'blocked', 'resolved'];
@@ -36,7 +37,7 @@ export function statusSources() {
   const branch = import.meta.env.PUBLIC_GITHUB_BRANCH || 'main';
   const srcs = [];
   if (repo) srcs.push(`https://raw.githubusercontent.com/${repo}/${branch}/public/live/status.json`);
-  srcs.push('/live/status.json');
+  srcs.push(`${base}live/status.json`);
   return srcs;
 }
 
