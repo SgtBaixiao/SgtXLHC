@@ -88,13 +88,14 @@ const nav = [
 
     // 主题切换
     const root = document.documentElement;
-    const saved = localStorage.getItem('theme');
+    let saved = null;
+    try { saved = localStorage.getItem('theme'); } catch { /* storage unavailable */ }
     if (saved) root.dataset.theme = saved;
     const btn = document.querySelector('[data-theme-toggle]');
     btn && btn.addEventListener('click', () => {
       const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
       root.dataset.theme = next;
-      localStorage.setItem('theme', next);
+      try { localStorage.setItem('theme', next); } catch { /* storage unavailable */ }
     });
 
     // 载入遮罩：动画结束移除
@@ -103,8 +104,9 @@ const nav = [
 
     // 锚点相对 base
     document.querySelectorAll('a[href^="/"]').forEach((a) => {
-      if (a.getAttribute('href').startsWith(base)) return;
-      if (a.getAttribute('href').startsWith('/')) a.href = base + a.getAttribute('href').slice(1);
+      const href = a.getAttribute('href');
+      if (!href || href.startsWith(base)) return;
+      if (href.startsWith('/')) a.setAttribute('href', base + href.slice(1));
     });
 
     // 全局细节感：键盘聚焦

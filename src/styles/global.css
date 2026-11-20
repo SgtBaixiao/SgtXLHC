@@ -374,12 +374,14 @@ code, kbd, samp {
   transition: grid-template-columns var(--dur-drawer) var(--ease-expo);
 }
 .drawer-shell.drawer-open { grid-template-columns: 1fr var(--drawer-w); }
+.drawer-shell:not(.drawer-open) .drawer { display: none; }
+.drawer-shell.drawer-open { grid-template-columns: minmax(0, 1fr) minmax(18rem, 36%); }
 
 .drawer {
   position: sticky;
   top: 0;
   align-self: start;
-  height: 100vh;
+  height: min(68vh, 620px);
   overflow-y: auto;
   border-left: 1px solid var(--hairline);
   background: var(--surface);
@@ -387,10 +389,14 @@ code, kbd, samp {
   transform: translateX(100%);
   transition: transform var(--dur-drawer) var(--ease-expo);
   z-index: 30;
-  min-width: var(--drawer-w-min);
+  min-width: 0;
   overscroll-behavior: contain;
 }
 .drawer-open .drawer { transform: translateX(0); }
+@media (max-width: 700px) {
+  .drawer-shell.drawer-open { grid-template-columns: minmax(0, 1fr); }
+  .drawer { position: static; height: auto; max-height: 28rem; border-left: 0; border-top: 1px solid var(--hairline); }
+}
 
 /* 抽屉内部内容（图组件注入） */
 .drawer__close {
@@ -666,3 +672,7 @@ code, kbd, samp {
   .loader-mask { display: none !important; }
   .badge i { animation: none !important; }
 }
+/* Native graph navigation remains available when Canvas is hard to operate. */
+.graph-list { margin: 1rem 0; font-family: var(--font-mono); }
+.graph-list ul { max-height: 24rem; overflow: auto; padding-left: 1.4rem; }
+.graph-list button { text-align: left; background: transparent; color: var(--ink); border: 1px solid var(--hairline); padding: .5rem; margin: .2rem; cursor: pointer; }

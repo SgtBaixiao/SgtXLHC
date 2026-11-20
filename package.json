@@ -1,5 +1,5 @@
 {
-  "name": "personal-site",
+  "name": "sgtxlhc",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,23 +14,33 @@
     "sync:status": "node scripts/sync-status.mjs",
     "notion:list": "node scripts/notion-publish.mjs --list",
     "notion:publish": "node scripts/notion-publish.mjs",
-    "bridge": "node scripts/publish-bridge.mjs"
+    "bridge": "node scripts/publish-bridge.mjs",
+    "check": "astro check",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "validate": "npm run test && npm run check && npm run build",
+    "build:project": "ASTRO_BASE=/SgtXLHC SITE_URL=https://sgtbaixiao.github.io/SgtXLHC npm run build"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.11",
     "@astrojs/sitemap": "^3.2.1",
     "astro": "^5.4.0",
+    "d3-drag": "^3.0.1",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.12",
     "@notionhq/client": "^2.2.15",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.2",
     "notion-to-md": "^3.1.9",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "yaml": "^2.9.1"
   },
   "engines": {
-    "node": ">=18.17"
+    "node": ">=22.12"
   }
 }

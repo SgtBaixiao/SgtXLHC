@@ -18,3 +18,10 @@ public/live/*.jsonl
 Thumbs.db
 .idea/
 .vscode/*.local
+
+# Operation locks and test artifacts
+.site-publisher.lock/
+public/*.json.lock/
+public/live/*.json.lock/
+playwright-report/
+test-results/

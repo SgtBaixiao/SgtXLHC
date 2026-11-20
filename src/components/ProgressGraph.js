@@ -1,19 +1,8 @@
-/**
- * /progress 进度图（07-wayfinder-pipeline）—— 08-graph-model「对接 wayfinder」：
- *  以 wayfinder 地图（.scratch/<effort>/map.md + issues/NN-<slug>.md）为源，
- *  generate-progress.mjs 生成 progress.json；本组件把 effort 画成主节点、
- *  把每个 ticket 画成子节点；Blocked by 画成虚线 depend 边。
- *
- * progress.json 契约：
- *  { schema, updated_at, generator, note, efforts: [
- *     { id, title, destination, note, decisions: [...], tickets: [
- *        { id, file, title, type, status, blocked_by: [id],
- *          question?, answer? } ] } ] }
- */
-import { createGraph } from '../lib/graph';
-import { statusColor, slugify, fetchFirst, startPolling } from '../lib/status';
+import { escapeHtml } from '../lib/dom.js';
+import { validateProgress } from '../lib/contracts.js';
+import { mountGraph } from '../lib/graph-controller.js';
+import { statusColor } from '../lib/status';
 import { base } from '../lib/site';
-import { bindDrawer } from '../lib/drawer';
 
 const STATUS_LABEL = {
   open: '进行中',
@@ -59,7 +48,8 @@ function buildGraph(p) {
   return { nodes, links };
 }
 
-function renderEffortDrawer(effort) {
+function renderEffortDrawer(raw) {
+  const effort = { ...raw, title: escapeHtml(raw.title), destination: escapeHtml(raw.destination), decisions: raw.decisions.map((d) => escapeHtml(d.gist)) };
   return `
     <p class="mono" style="color:var(--ink-faint);margin:0 0 .25rem">Effort</p>
     <h3 style="margin:0 0 1rem">${effort.title}</h3>
@@ -71,7 +61,8 @@ function renderEffortDrawer(effort) {
   `;
 }
 
-function renderTicketDrawer(ticket) {
+function renderTicketDrawer(raw) {
+  const ticket = { ...raw, ...Object.fromEntries(['title', 'type', 'question', 'answer', 'file'].map((key) => [key, escapeHtml(raw[key])])) };
   const label = STATUS_LABEL[ticket.status] || ticket.status;
   const cls = ticket.status === 'resolved' ? 'resolved' : ticket.status === 'claimed' ? 'working' : 'pending';
   const blockedBy = (ticket.blocked_by || []).length
@@ -92,66 +83,14 @@ function renderTicketDrawer(ticket) {
 }
 
 export function initProgressGraph() {
-  let canvas = document.querySelector('[data-progress-graph]');
-  const shell = document.querySelector('[data-graph-shell]');
-  const aside = document.querySelector('[data-graph-drawer]');
-  const metaEl = document.querySelector('[data-progress-meta]');
-  const emptyEl = document.querySelector('[data-graph-empty]');
-
-  if (!canvas) return;
-
-  const drawer = bindDrawer(shell, aside);
-  let graph = null;
-
-  function render(p) {
-    const data = buildGraph(p);
-    if (graph) {
-      graph.destroy();
-      graph = null;
-      canvas.replaceWith(canvas.cloneNode(true));
-      canvas = document.querySelector('[data-progress-graph]');
-    }
-    if (emptyEl) emptyEl.style.display = data.nodes.length ? 'none' : 'grid';
-    if (!data.nodes.length) {
-      if (metaEl) metaEl.textContent = '暂无 wayfinder 数据';
-      return;
-    }
-    graph = createGraph(canvas, {
-      data,
-      labelSize: 11,
-      ariaLabel: 'wayfinder 开发进度图：effort 与 ticket 节点，虚线为阻塞关系',
-      onSelect(node) {
-        if (!node) { drawer.close(); return; }
-        aside.innerHTML = node.detail.type === 'effort'
-          ? renderEffortDrawer(node.detail.effort)
-          : renderTicketDrawer(node.detail.ticket);
-        drawer.open();
-      },
-    });
-    if (metaEl) {
-      const efforts = p.efforts.length;
-      const tickets = p.efforts.reduce((a, e) => a + (e.tickets || []).length, 0);
-      const done = p.efforts.reduce((a, e) => a + (e.tickets || []).filter((t) => t.status === 'resolved').length, 0);
-      metaEl.textContent = `${efforts} efforts · ${done}/${tickets} tickets resolved`;
-    }
-  }
-
-  let first = true;
-  async function load() {
-    return fetchFirst([`${base}progress.json`]);
-  }
-  async function refresh() {
-    try {
-      render(await load());
-    } catch {
-      if (first && emptyEl) emptyEl.style.display = 'grid';
-      if (metaEl) metaEl.textContent = '进度源不可达';
-    } finally {
-      first = false;
-    }
-  }
-
-  refresh();
-  const stop = startPolling(refresh, null);
-  return { destroy: () => { stop(); if (graph) graph.destroy(); } };
+  return mountGraph({
+    canvasSelector: '[data-progress-graph]', metaSelector: '[data-progress-meta]',
+    sources: () => [`${base}progress.json`], validate: validateProgress, buildGraph,
+    renderDetails: (node) => node.detail.type === 'effort' ? renderEffortDrawer(node.detail.effort) : renderTicketDrawer(node.detail.ticket),
+    summary(value) {
+      const tickets = value.efforts.flatMap((effort) => effort.tickets);
+      return `${value.efforts.length} efforts · ${tickets.filter((ticket) => ticket.status === 'resolved').length}/${tickets.length} tickets resolved`;
+    },
+    emptyMessage: '暂无 wayfinder 数据', ariaLabel: 'wayfinder 开发进度图：effort 与 ticket 节点，虚线为阻塞关系',
+  });
 }

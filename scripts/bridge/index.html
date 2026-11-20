@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Publish Bridge</title><link rel="stylesheet" href="/style.css"></head>
+<body><header class="top"><div class="brand">AGENT·WORKSPACE <b>PUBLISH BRIDGE</b></div><div class="warn">本地发布</div></header>
+<section class="head"><div class="kicker">NOTION / SELECT</div><h1>选择要归档的文章</h1><p class="sub">仅可发布已勾选 Published 的文章。先保存到本地，按需选择覆盖或提交推送。</p></section>
+<main class="wrap"><div class="actions"><span id="count" class="count"></span><button id="all">全选</button><button id="none">清空</button><button id="publish" class="primary" disabled>发布所选</button></div>
+<div class="actions"><label><input type="checkbox" id="overwrite"> 覆盖同源文章</label><label><input type="checkbox" id="push"> 提交并推送</label></div>
+<div id="list" class="list">读取中…</div><pre id="log" class="log" role="status" aria-live="polite"></pre></main><script type="module" src="/client.js"></script></body></html>

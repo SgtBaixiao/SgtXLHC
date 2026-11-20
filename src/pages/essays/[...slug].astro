@@ -1,11 +1,12 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { SITE, base } from '../../lib/site';
-import { entrySlug } from '../../lib/essays';
+import { entrySlug, assertUniqueEssayUrls } from '../../lib/essays';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
   const essays = (await getCollection('essays')).filter((e) => !e.data.draft);
+  assertUniqueEssayUrls(essays);
   return essays.map((e) => ({
     params: { slug: entrySlug(e) },
     props: { entry: e },

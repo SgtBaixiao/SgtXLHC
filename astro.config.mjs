@@ -8,7 +8,8 @@ const base = process.env.ASTRO_BASE || '/';
 export default defineConfig({
   site: process.env.SITE_URL || 'https://agent-workspace.example',
   base,
-  trailingSlash: 'never',
+  // Existing Pages links use both directory forms; preview must accept both too.
+  trailingSlash: 'ignore',
   output: 'static',
   build: {
     inlineStylesheets: 'auto',

@@ -12,11 +12,11 @@
  *  - fetch 一律 { cache:'no-store' }，不加自定义头（防预检 403）
  *  - 轮询 90s 起 + 指数退避封顶 10min；匿名限速 ~60/hr
  */
-import { cssVar } from './graph';
+import { cssVar } from './dom.js';
 import { base } from './site';
+export { fetchFirst, startPolling } from './transport.js';
+export { slugify, AGENT_STATUS, TASK_STATUS } from './contracts.js';
 
-export const AGENT_STATUS = ['idle', 'working', 'blocked', 'error'];
-export const TASK_STATUS = ['pending', 'in-progress', 'blocked', 'resolved'];
 
 export const AGENT_STATUS_LABEL = {
   idle: '待命',
@@ -42,19 +42,6 @@ export function statusSources() {
 }
 
 /** 依次尝试所有源，返回第一个成功 JSON；全失败则抛错 */
-export async function fetchFirst(urls, opts = {}) {
-  let lastErr = null;
-  for (const u of urls) {
-    try {
-      const r = await fetch(u, { cache: 'no-store', ...opts });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return await r.json();
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw new Error(lastErr ? `所有状态源都不可达：${lastErr.message}` : '无状态源');
-}
 
 /** 状态 → 颜色（读 CSS token） */
 export function statusColor(status) {
@@ -74,6 +61,7 @@ export function statusColor(status) {
 export function timeAgo(iso) {
   if (!iso) return '—';
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (!Number.isFinite(s)) return '—';
   if (s < 60) return '刚刚';
   if (s < 3600) return `${Math.floor(s / 60)} 分钟前`;
   if (s < 86400) return `${Math.floor(s / 3600)} 小时前`;
@@ -83,33 +71,8 @@ export function timeAgo(iso) {
 export function formatDateTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '—';
   return d.toLocaleString('zh-CN', { hour12: false });
 }
 
 /** 轮询：interval 起 + 指数退避封顶 maxInterval；返回 stop() */
-export function startPolling(load, cb, { interval = 90000, maxInterval = 600000 } = {}) {
-  let fail = 0;
-  let timer = 0;
-  async function tick() {
-    try {
-      const d = await load();
-      fail = 0;
-      cb(d, null);
-    } catch (e) {
-      fail += 1;
-      cb(null, e);
-    }
-    timer = setTimeout(tick, Math.min(interval * 2 ** Math.min(fail, 3), maxInterval));
-  }
-  timer = setTimeout(tick, interval);
-  return () => clearTimeout(timer);
-}
-
-export function slugify(s) {
-  return String(s)
-    .trim()
-    .toLowerCase()
-    .replace(/[^\w一-龥-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}

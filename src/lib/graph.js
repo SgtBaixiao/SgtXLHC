@@ -18,15 +18,14 @@
 import { forceSimulation, forceLink, forceManyBody, forceX, forceY, forceCollide } from 'd3-force';
 import { zoom as d3zoom, zoomIdentity } from 'd3-zoom';
 import { select } from 'd3-selection';
+import { dragEnable } from 'd3-drag';
+import { LIMITS } from './contracts.js';
+import { cssVar } from './dom.js';
+export { cssVar } from './dom.js';
 
 const MONO_FONT = `"JetBrains Mono", "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, monospace`;
 const TRAIL_FRAMES = 20;
 const TRAIL_EVERY = 2; // 每 2 帧采一个点
-
-export function cssVar(name, fallback = '') {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
-}
 
 export function createGraph(canvas, opts = {}) {
   const ctx = canvas.getContext('2d');
@@ -43,9 +42,20 @@ export function createGraph(canvas, opts = {}) {
     ariaLabel = '图谱',
   } = opts;
 
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let reduce = motion.matches, destroyed = false, visible = true;
+  if (data.nodes.length > LIMITS.nodes || data.links.length > LIMITS.links) throw new Error('Graph exceeds budget');
   const simNodes = data.nodes.map((n) => ({ ...n }));
   const simLinks = data.links.map((l) => ({ ...l }));
+  const byId = new Map(simNodes.map((node) => [node.id, node]));
+  if (byId.size !== simNodes.length) throw new Error('Duplicate graph node');
+  const adjacency = new Map(simNodes.map((node) => [node.id, new Set()]));
+  for (const link of simLinks) {
+    if (!byId.has(link.source) || !byId.has(link.target)) throw new Error('Missing graph endpoint');
+    adjacency.get(link.source).add(link.target); adjacency.get(link.target).add(link.source);
+  }
+  const events = new AbortController();
+  const listen = (name, handler) => canvas.addEventListener(name, handler, { signal: events.signal });
   const idOf = (d) => d.id;
 
   // ---- 尺寸 / DPR ----
@@ -68,6 +78,9 @@ export function createGraph(canvas, opts = {}) {
         n.baseY = ys.get(n.id) ?? H / 2;
       }
     }
+    // d3 caches target coordinates when the force is initialized.
+    sim.force('x').x((n) => n.baseX ?? W / 2);
+    sim.force('y').y((n) => n.baseY ?? H / 2);
     reheat(0.35);
   }
 
@@ -116,21 +129,25 @@ export function createGraph(canvas, opts = {}) {
   };
 
   function neighborsOf(id) {
-    const set = new Set();
-    for (const l of simLinks) {
-      const a = typeof l.source === 'object' ? l.source.id : l.source;
-      const b = typeof l.target === 'object' ? l.target.id : l.target;
-      if (a === id) set.add(b);
-      if (b === id) set.add(a);
-    }
-    return set;
+    return adjacency.get(id) || new Set();
   }
 
   // ---- 交互 ----
+  let mouseView = null;
+  const zoomGestures = new Set();
   const zoomBeh = d3zoom()
     .scaleExtent([0.35, 4])
+    .duration(0)
     .filter((ev) => !ev.button || ev.button === 0)
-    .on('zoom', (ev) => { transform = ev.transform; draw(); });
+    .on('start.lifecycle', (ev) => {
+      if (canvas.__zooming) zoomGestures.add(canvas.__zooming);
+      if (ev.sourceEvent?.type === 'mousedown') mouseView = ev.sourceEvent.view;
+    })
+    .on('end.lifecycle', (ev) => {
+      if (ev.sourceEvent?.type === 'mouseup') mouseView = null;
+      for (const gesture of zoomGestures) if (!gesture.active) zoomGestures.delete(gesture);
+    })
+    .on('zoom', (ev) => { if (!destroyed) { transform = ev.transform; draw(); } });
   select(canvas).call(zoomBeh);
 
   const toSim = (e) => {
@@ -143,11 +160,11 @@ export function createGraph(canvas, opts = {}) {
 
   let downX = null, downY = null, dragging = false;
 
-  canvas.addEventListener('pointerdown', (e) => {
+  listen('pointerdown', (e) => {
     downX = e.clientX; downY = e.clientY; dragging = false;
     try { canvas.setPointerCapture(e.pointerId); } catch { /* noop */ }
   });
-  canvas.addEventListener('pointermove', (e) => {
+  listen('pointermove', (e) => {
     if (downX !== null && Math.hypot(e.clientX - downX, e.clientY - downY) > 4) dragging = true;
     const p = toSim(e);
     const hit = hitTest(p.x, p.y);
@@ -159,7 +176,7 @@ export function createGraph(canvas, opts = {}) {
     }
     canvas.style.cursor = hit ? 'pointer' : 'grab';
   });
-  canvas.addEventListener('pointerup', (e) => {
+  listen('pointerup', (e) => {
     if (!dragging) {
       const p = toSim(e);
       const hit = hitTest(p.x, p.y);
@@ -169,7 +186,7 @@ export function createGraph(canvas, opts = {}) {
     }
     downX = null;
   });
-  canvas.addEventListener('pointerleave', () => {
+  listen('pointerleave', () => {
     hoverId = null; neighborIds = new Set();
     if (onHover) onHover(null);
     draw();
@@ -177,8 +194,9 @@ export function createGraph(canvas, opts = {}) {
 
   // 键盘可达：方向键切换焦点，Enter/空格打开抽屉
   const focussables = simNodes.map((n) => n.id);
-  let focusIdx = 0;
-  canvas.addEventListener('keydown', (e) => {
+  let focusIdx = -1;
+  listen('keydown', (e) => {
+    if (!focussables.length) return;
     if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
       focusIdx = (focusIdx + 1) % focussables.length;
     } else if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
@@ -189,12 +207,13 @@ export function createGraph(canvas, opts = {}) {
       e.preventDefault();
       return;
     } else return;
+    e.preventDefault();
     hoverId = focussables[focusIdx];
     neighborIds = new Set([hoverId, ...neighborsOf(hoverId)]);
     draw();
   });
   canvas.tabIndex = 0;
-  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('role', 'group');
   canvas.setAttribute('aria-label', ariaLabel);
 
   function hitTest(x, y) {
@@ -218,6 +237,7 @@ export function createGraph(canvas, opts = {}) {
   }
 
   function draw() {
+    if (destroyed) return;
     ctx.clearRect(0, 0, W, H);
     ctx.save();
     ctx.translate(transform.x, transform.y);
@@ -239,8 +259,8 @@ export function createGraph(canvas, opts = {}) {
   function drawLinks() {
     const inkCol = ink();
     for (const l of simLinks) {
-      const s = typeof l.source === 'object' ? l.source : simNodes.find((n) => n.id === l.source);
-      const t = typeof l.target === 'object' ? l.target : simNodes.find((n) => n.id === l.target);
+      const s = typeof l.source === 'object' ? l.source : byId.get(l.source);
+      const t = typeof l.target === 'object' ? l.target : byId.get(l.target);
       if (!s || !t) continue;
       const ps = pos(s), pt = pos(t);
       const dim = hoverDim(s.id, t.id);
@@ -365,7 +385,7 @@ export function createGraph(canvas, opts = {}) {
     } else {
       for (const n of simNodes) { n.rx = n.x; n.ry = n.y; }
     }
-    if (frameState.trailOn && frameState.t % TRAIL_EVERY < 0.016) {
+    if (frameState.trailOn && ++frame % TRAIL_EVERY === 0) {
       for (const n of simNodes) {
         let hist = trail.get(n.id);
         if (!hist) { hist = []; trail.set(n.id, hist); }
@@ -375,28 +395,72 @@ export function createGraph(canvas, opts = {}) {
     }
   }
 
+  let frame = 0;
   function loop() {
+    if (destroyed || !visible || document.hidden || reduce) { raf = 0; return; }
     tickFloat();
     draw();
     raf = requestAnimationFrame(loop);
   }
 
   function reheat(a = 1) {
-    sim.alpha(Math.max(sim.alpha(), a)).restart();
+    if (destroyed) return;
+    sim.alpha(Math.max(sim.alpha(), a));
+    if (reduce) {
+      sim.stop();
+      for (let step = 0; step < 160; step++) sim.tick();
+      simNodes.forEach((node) => { node.rx = node.x; node.ry = node.y; });
+      draw();
+    } else if (visible && !document.hidden) sim.restart();
   }
+
+  function activity() {
+    if (destroyed) return;
+    cancelAnimationFrame(raf); raf = 0; sim.stop();
+    if (visible && !document.hidden) {
+      if (reduce) reheat(0.1);
+      else { sim.restart(); raf = requestAnimationFrame(loop); }
+    }
+  }
+  function motionChanged() {
+    reduce = motion.matches;
+    frameState.floatAmp = reduce ? 0 : 4.5;
+    frameState.trailOn = frameState.pulseOn = !reduce;
+    trail.clear(); activity();
+  }
+  motion.addEventListener('change', motionChanged);
+  document.addEventListener('visibilitychange', activity);
+  const io = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; activity(); });
+  io.observe(canvas);
+  const themes = new MutationObserver(() => draw());
+  themes.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   const ro = new ResizeObserver(() => resize());
   ro.observe(canvas);
 
   resize();
-  if (reduce) { draw(); } else { loop(); }
+  activity();
 
   return {
     destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      if (mouseView) {
+        select(mouseView).on('mousemove.zoom mouseup.zoom', null);
+        dragEnable(mouseView, false); mouseView = null;
+      }
+      for (const gesture of zoomGestures) if (gesture.wheel) clearTimeout(gesture.wheel);
+      zoomGestures.clear();
+      delete canvas.__zooming;
+      events.abort();
       cancelAnimationFrame(raf);
       ro.disconnect();
+      io.disconnect(); themes.disconnect();
+      motion.removeEventListener('change', motionChanged);
+      document.removeEventListener('visibilitychange', activity);
       sim.stop();
       select(canvas).on('.zoom', null);
+      zoomBeh.on('.lifecycle', null).on('zoom', null);
     },
     resetView() {
       transform = zoomIdentity;
@@ -404,6 +468,7 @@ export function createGraph(canvas, opts = {}) {
     },
     reheat,
     selectNode(id) {
+      if (destroyed || !byId.has(id)) return;
       selectedId = id;
       hoverId = id;
       neighborIds = new Set([id, ...neighborsOf(id)]);

@@ -1,0 +1,125 @@
+import { test, expect } from '@playwright/test';
+import { build } from 'esbuild';
+import { createBridge } from '../../scripts/publish-bridge.mjs';
+import { once } from 'node:events';
+const now = '2026-11-20T00:00:00Z';
+const status = { schema: '1.0', updated_at: now, agents: [{ id: 'pi', name: '<img src=x onerror="window.pwned=1">', status: 'working', heartbeat: now, current_task: 'Current task', task_status: 'in-progress', note: '<script>window.pwned=1</script>' }] };
+test('project-base routes, node list and drawer survive untrusted status text', async ({ page }, testInfo) => {
+  const errors = []; page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/live/status.json', (route) => route.fulfill({ json: status }));
+  await page.goto('./');
+  await expect(page.locator('[data-status-meta]')).toContainText('1 agents');
+  await page.locator('.graph-list summary').click();
+  await page.locator('.graph-list button').first().click();
+  await expect(page.locator('.drawer__body h3')).toHaveText(status.agents[0].name);
+  await expect(page.locator('.drawer__body img')).toHaveCount(0);
+  await page.locator('[data-drawer-close]').click();
+  await expect(page.locator('[data-graph-shell]')).not.toHaveClass(/drawer-open/);
+  await expect(page.locator('[data-graph-drawer]')).toBeHidden();
+  await page.locator('.graph-list button').first().click(); await page.keyboard.press('Escape');
+  await expect(page.locator('[data-graph-shell]')).not.toHaveClass(/drawer-open/);
+  await expect(page.locator('[data-agent-graph]')).toHaveCount(1);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('[data-agent-graph]').scrollIntoViewIfNeeded();
+  await expect(page.locator('.loader-mask')).toBeHidden();
+  await page.screenshot({ path: testInfo.outputPath('home.png'), fullPage: true });
+  expect(await page.evaluate(() => window.pwned)).toBeUndefined();
+  await page.getByRole('link', { name: '进度', exact: true }).click();
+  await expect(page).toHaveURL(/\/SgtXLHC\/progress/);
+  await expect(page.locator('[data-progress-meta]')).toContainText('efforts');
+  await page.getByRole('link', { name: '随笔', exact: true }).click();
+  await page.locator('.essay').first().click();
+  await expect(page).toHaveURL(/\/SgtXLHC\/essays\/hello-workspace/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/SgtXLHC\/essays\/hello-workspace/);
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+test('malformed status produces visible empty state and progress details preserve decision text', async ({ page }) => {
+  await page.route('**/live/status.json', (route) => route.fulfill({ json: { broken: true } }));
+  await page.goto('./'); await expect(page.locator('[data-status-meta]')).toContainText('暂不可达');
+  await expect(page.locator('[data-graph-empty]')).toBeVisible();
+  await page.goto('progress'); await page.locator('.graph-list summary').click();
+  await page.locator('.graph-list button').first().click();
+  await expect(page.locator('.drawer__body')).not.toContainText('[object Object]');
+  await expect(page.locator('[data-drawer-close]')).toBeVisible();
+});
+test('reduced-motion renderer settles large graphs and destroy removes listeners and scheduled frames', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('./');
+  const bundle = await build({ entryPoints: ['src/lib/graph.js'], bundle: true, write: false, format: 'iife', globalName: 'GraphTest', platform: 'browser' });
+  await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  const result = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:600px;height:400px'; document.body.replaceChildren(canvas);
+    let selects = 0, frames = 0;
+    const original = window.requestAnimationFrame;
+    window.requestAnimationFrame = (callback) => { frames++; return original(callback); };
+    const nodes = Array.from({ length: 501 }, (_, index) => ({ id: `n${index}`, label: `Node ${index}`, kind: index ? 'leaf' : 'primary' }));
+    const links = nodes.slice(1).map((node) => ({ source: 'n0', target: node.id }));
+    const started = performance.now();
+    const graph = GraphTest.createGraph(canvas, { data: { nodes, links }, onSelect: () => selects++ });
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    graph.destroy();
+    const framesAtDestroy = frames;
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: 0, clientY: 0 }));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const empty = GraphTest.createGraph(canvas, { data: { nodes: [], links: [] } });
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' })); empty.destroy();
+    window.requestAnimationFrame = original;
+    return { selects, framesAtDestroy, frames, elapsed: performance.now() - started, width: canvas.width };
+  });
+  expect(result.selects).toBe(1); expect(result.frames).toBe(result.framesAtDestroy); expect(result.width).toBeGreaterThan(0);
+  expect(result.elapsed).toBeLessThan(5000);
+  console.log(`501-node reduced-motion fixture: ${Math.round(result.elapsed)} ms`);
+});
+test('local publishing UI renders Notion text safely and keeps destructive options off', async ({ page }) => {
+  const server = createBridge({ publisher: { list: async () => [{ id: '2'.repeat(32), title: '<img src=x onerror="window.pwned=1">', tags: ['<svg onload=bad>'], published: true }], publish: async () => { throw Object.assign(new Error('write failed'), { phase: 'write', results: [{ title: 'Saved article', file: 'saved.md', written: true }] }); } } });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    await page.goto(`http://127.0.0.1:${server.address().port}`);
+    await expect(page.locator('#list .t')).toHaveText('<img src=x onerror="window.pwned=1">');
+    await expect(page.locator('#list img')).toHaveCount(0);
+    await expect(page.locator('#overwrite')).not.toBeChecked(); await expect(page.locator('#push')).not.toBeChecked();
+    await page.locator('#all').click(); await expect(page.locator('#publish')).toBeEnabled();
+    await page.locator('#publish').click();
+    await expect(page.locator('#log')).toContainText('已保留本地文件 saved.md');
+    await expect(page.locator('#log')).toContainText('失败阶段：write');
+  } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+});
+test('destroy during a d3 mouse drag restores window listeners and selection', async ({ page }) => {
+  await page.goto('./');
+  const bundle = await build({ entryPoints: ['src/lib/graph.js'], bundle: true, write: false, format: 'iife', globalName: 'GraphTest', platform: 'browser' });
+  await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  const result = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:200px;height:200px'; document.body.replaceChildren(canvas);
+    const graph = GraphTest.createGraph(canvas, { data: { nodes: [{ id: 'a', label: 'A' }], links: [] } });
+    canvas.dispatchEvent(new MouseEvent('mousedown', { view: window, clientX: 20, clientY: 20, bubbles: true }));
+    const active = window.__on?.some((event) => event.type === 'mousemove' && event.name === 'zoom');
+    graph.destroy();
+    const listeners = (window.__on || []).filter((event) => event.name === 'zoom' || event.name === 'drag').map((event) => `${event.type}.${event.name}`);
+    const before = JSON.stringify(canvas.__zoom);
+    window.dispatchEvent(new MouseEvent('mousemove', { view: window, clientX: 100, clientY: 100 }));
+    return { active, listeners, changed: before !== JSON.stringify(canvas.__zoom), noselect: document.documentElement.__noselect };
+  });
+  expect(result.active).toBe(true); expect(result.listeners).toEqual([]); expect(result.changed).toBe(false); expect(result.noselect).toBeUndefined();
+});
+test('overlapping wheel and mouse gestures remain releasable after wheel idle', async ({ page }) => {
+  await page.goto('./');
+  const bundle = await build({ entryPoints: ['src/lib/graph.js'], bundle: true, write: false, format: 'iife', globalName: 'GraphTest', platform: 'browser' });
+  await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  const result = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:200px;height:200px'; document.body.replaceChildren(canvas);
+    const graph = GraphTest.createGraph(canvas, { data: { nodes: [{ id: 'a', label: 'A' }], links: [] } });
+    canvas.dispatchEvent(new WheelEvent('wheel', { view: window, clientX: 20, clientY: 20, deltaY: -100, bubbles: true, cancelable: true }));
+    canvas.dispatchEvent(new MouseEvent('mousedown', { view: window, clientX: 20, clientY: 20, bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    const active = window.__on?.some((event) => event.type === 'mousemove' && event.name === 'zoom');
+    graph.destroy();
+    const listeners = (window.__on || []).filter((event) => event.name === 'zoom' || event.name === 'drag').map((event) => `${event.type}.${event.name}`);
+    const before = JSON.stringify(canvas.__zoom);
+    window.dispatchEvent(new MouseEvent('mousemove', { view: window, clientX: 100, clientY: 100 }));
+    return { active, listeners, changed: before !== JSON.stringify(canvas.__zoom), noselect: document.documentElement.__noselect };
+  });
+  expect(result.active).toBe(true); expect(result.listeners).toEqual([]); expect(result.changed).toBe(false); expect(result.noselect).toBeUndefined();
+});
