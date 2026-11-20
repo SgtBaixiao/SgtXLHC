@@ -17,7 +17,7 @@ export async function GET(context: APIContext) {
       pubDate: e.data.date,
       description: e.data.excerpt || '',
       link,
-      customData: e.data.tags?.length ? e.data.tags.map((t) => `<category>${t}</category>`).join('') : '',
+      customData: e.data.tags?.length ? e.data.tags.map((t) => `<category>${t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!))}</category>`).join('') : '',
     };
   });
 

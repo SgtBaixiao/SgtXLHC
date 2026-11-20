@@ -7,9 +7,9 @@ import { getCollection } from 'astro:content';
 const essays = (await getCollection('essays'))
   .filter((e) => !e.data.draft)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-  .slice(0, 5);
+  ;
 const recent = essays.length ? essays[0] : null;
-const pct = essays.length ? Math.min(100, Math.round(100 / Math.max(essays.length, 6) * essays.length)) : 0;
+
 ---
 
 <Base title={SITE.title} description={SITE.description} active="/">
@@ -22,7 +22,7 @@ const pct = essays.length ? Math.min(100, Math.round(100 / Math.max(essays.lengt
     <p class="hero__lede" data-reveal>
       首页展示 agent 实时工作状态；进度页展示 wayfinder 决策图谱；
       随笔页归档 Notion 文章。状态由各 agent 在会话结束/停止时上报，
-      经 GitHub Actions 静默部署同步到本页。
+      通过页面轮询读取最新公开状态。
     </p>
     <div class="hero__cta" data-reveal>
       <a class="btn" href={`${base}progress/`}>查看进度 <span aria-hidden="true">→</span></a>
@@ -121,4 +121,5 @@ const pct = essays.length ? Math.min(100, Math.round(100 / Math.max(essays.lengt
 <script>
   import { initAgentGraph } from '../components/AgentGraph.js';
   initAgentGraph();
+  window.addEventListener('pageshow', (event) => { if (event.persisted) initAgentGraph(); });
 </script>

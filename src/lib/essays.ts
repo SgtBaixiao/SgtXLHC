@@ -9,7 +9,19 @@
 import type { CollectionEntry } from 'astro:content';
 
 export function entrySlug(e: CollectionEntry<'essays'>): string {
-  if (e.data.slug) return e.data.slug;
+  if (e.data.slug) {
+    if (!/^[\p{L}\p{N}_-]{1,80}$/u.test(e.data.slug)) throw new Error(`Invalid essay slug: ${e.id}`);
+    return e.data.slug;
+  }
   const id = e.id.replace(/\.md$/, '');
   return id.replace(/^\d{4}-\d{2}-\d{2}-/, '') || id;
+}
+
+export function assertUniqueEssayUrls(entries: CollectionEntry<'essays'>[]) {
+  const urls = new Set<string>();
+  for (const entry of entries) {
+    const url = entrySlug(entry).normalize('NFC').toLowerCase();
+    if (urls.has(url)) throw new Error(`Duplicate essay URL: ${url}`);
+    urls.add(url);
+  }
 }

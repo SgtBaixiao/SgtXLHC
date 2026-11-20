@@ -1,9 +1,12 @@
+import { escapeHtml } from '../lib/dom.js';
+import { validateStatus } from '../lib/contracts.js';
+import { mountNodeList } from '../lib/node-list.js';
 /**
  * 首页 Agent 状态图（双子星座）—— 08-graph-model：
  *  agent + 当前任务两级节点；中心 agent 节点（Claude / pi），子节点挂当前任务；
  *  状态着色 + 脉冲；点击 agent 看状态，点击任务看细节；抽屉摘要+详情混合。
  */
-import { createGraph, cssVar } from '../lib/graph';
+import { createGraph } from '../lib/graph';
 import {
   statusSources,
   fetchFirst,
@@ -47,7 +50,8 @@ function buildGraph(statusData) {
   return { nodes, links };
 }
 
-function renderAgentDrawer(agent) {
+function renderAgentDrawer(raw) {
+  const agent = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, escapeHtml(value)]));
   const st = AGENT_STATUS_LABEL[agent.status] || agent.status;
   const ts = TASK_STATUS_LABEL[agent.task_status] || '—';
   return `
@@ -67,7 +71,8 @@ function renderAgentDrawer(agent) {
   `;
 }
 
-function renderTaskDrawer(agent) {
+function renderTaskDrawer(raw) {
+  const agent = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, escapeHtml(value)]));
   const ts = TASK_STATUS_LABEL[agent.task_status] || '—';
   return `
     <p class="mono" style="color:var(--ink-faint);margin:0 0 .25rem">当前任务</p>
@@ -80,7 +85,7 @@ function renderTaskDrawer(agent) {
   `;
 }
 
-export function initAgentGraph(opts = {}) {
+export function initAgentGraph() {
   let canvas = document.querySelector('[data-agent-graph]');
   const shell = document.querySelector('[data-graph-shell]');
   const aside = document.querySelector('[data-graph-drawer]');
@@ -93,6 +98,13 @@ export function initAgentGraph(opts = {}) {
 
   const drawer = bindDrawer(shell, aside);
   let graph = null;
+  let nodeList = null;
+  function selectNode(node) {
+    if (!node) { drawer.close(); return; }
+    drawer.render(node.detail.type === 'agent' ? renderAgentDrawer(node.detail.agent) : renderTaskDrawer(node.detail.agent));
+    drawer.open();
+    graph?.selectNode(node.id);
+  }
 
   function render(statusData) {
     const data = buildGraph(statusData);
@@ -100,12 +112,13 @@ export function initAgentGraph(opts = {}) {
     if (graph) {
       graph.destroy();
       graph = null;
-      // 用克隆节点替换旧 canvas，清掉旧图上的 zoom 回调与指针监听
-      canvas.replaceWith(canvas.cloneNode(true));
-      canvas = document.querySelector('[data-agent-graph]');
+
     }
 
-    if (emptyEl) emptyEl.style.display = data.nodes.length ? 'none' : 'grid';
+    if (emptyEl) { emptyEl.hidden = !!data.nodes.length; emptyEl.style.display = data.nodes.length ? 'none' : 'grid'; }
+    drawer.close();
+    nodeList?.destroy();
+    nodeList = mountNodeList(shell.parentElement, data.nodes, selectNode);
     if (!data.nodes.length) {
       if (metaEl) metaEl.textContent = '尚无 agent 状态上报';
       return;
@@ -114,13 +127,7 @@ export function initAgentGraph(opts = {}) {
     graph = createGraph(canvas, {
       data,
       ariaLabel: 'Agent 工作状态图谱：节点为 agent 与当前任务',
-      onSelect(node) {
-        if (!node) { drawer.close(); return; }
-        aside.innerHTML = node.detail.type === 'agent'
-          ? renderAgentDrawer(node.detail.agent)
-          : renderTaskDrawer(node.detail.agent);
-        drawer.open();
-      },
+      onSelect: selectNode,
     });
 
     // 元信息
@@ -133,24 +140,17 @@ export function initAgentGraph(opts = {}) {
     if (workingEl) workingEl.textContent = String(statusData.agents.filter((a) => a.status === 'working').length);
   }
 
-  let first = true;
-  async function load() {
-    return fetchFirst(statusSources());
-  }
-
-  async function refresh() {
-    try {
-      const d = await load();
-      render(d);
-    } catch {
-      if (first && emptyEl) emptyEl.style.display = 'grid';
-      if (metaEl) metaEl.textContent = '状态源暂不可达，显示最近一次构建数据';
-    } finally {
-      first = false;
-    }
-  }
-
-  refresh();
-  const stop = startPolling(refresh, null);
-  return { destroy: () => { stop(); if (graph) graph.destroy(); } };
+  const stop = startPolling(
+    ({ signal }) => fetchFirst(statusSources(), { signal, validate: validateStatus }),
+    (value, error) => {
+      if (error) {
+        if (metaEl) metaEl.textContent = '数据源暂不可达，保留最后有效数据';
+        if (!graph && emptyEl) { emptyEl.hidden = false; emptyEl.style.display = 'grid'; }
+      } else render(value);
+    },
+    { immediate: true },
+  );
+  const destroy = () => { stop(); graph?.destroy(); nodeList?.destroy(); drawer.destroy(); window.removeEventListener('pagehide', destroy); };
+  window.addEventListener('pagehide', destroy, { once: true });
+  return { destroy };
 }

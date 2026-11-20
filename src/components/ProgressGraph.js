@@ -1,3 +1,6 @@
+import { escapeHtml } from '../lib/dom.js';
+import { validateProgress } from '../lib/contracts.js';
+import { mountNodeList } from '../lib/node-list.js';
 /**
  * /progress 进度图（07-wayfinder-pipeline）—— 08-graph-model「对接 wayfinder」：
  *  以 wayfinder 地图（.scratch/<effort>/map.md + issues/NN-<slug>.md）为源，
@@ -11,7 +14,7 @@
  *          question?, answer? } ] } ] }
  */
 import { createGraph } from '../lib/graph';
-import { statusColor, slugify, fetchFirst, startPolling } from '../lib/status';
+import { statusColor, fetchFirst, startPolling } from '../lib/status';
 import { base } from '../lib/site';
 import { bindDrawer } from '../lib/drawer';
 
@@ -59,7 +62,8 @@ function buildGraph(p) {
   return { nodes, links };
 }
 
-function renderEffortDrawer(effort) {
+function renderEffortDrawer(raw) {
+  const effort = { ...raw, title: escapeHtml(raw.title), destination: escapeHtml(raw.destination), decisions: raw.decisions.map((d) => escapeHtml(d.gist)) };
   return `
     <p class="mono" style="color:var(--ink-faint);margin:0 0 .25rem">Effort</p>
     <h3 style="margin:0 0 1rem">${effort.title}</h3>
@@ -71,7 +75,8 @@ function renderEffortDrawer(effort) {
   `;
 }
 
-function renderTicketDrawer(ticket) {
+function renderTicketDrawer(raw) {
+  const ticket = { ...raw, ...Object.fromEntries(['title', 'type', 'question', 'answer', 'file'].map((key) => [key, escapeHtml(raw[key])])) };
   const label = STATUS_LABEL[ticket.status] || ticket.status;
   const cls = ticket.status === 'resolved' ? 'resolved' : ticket.status === 'claimed' ? 'working' : 'pending';
   const blockedBy = (ticket.blocked_by || []).length
@@ -102,16 +107,25 @@ export function initProgressGraph() {
 
   const drawer = bindDrawer(shell, aside);
   let graph = null;
+  let nodeList = null;
+  function selectNode(node) {
+    if (!node) { drawer.close(); return; }
+    drawer.render(node.detail.type === 'effort' ? renderEffortDrawer(node.detail.effort) : renderTicketDrawer(node.detail.ticket));
+    drawer.open();
+    graph?.selectNode(node.id);
+  }
 
   function render(p) {
     const data = buildGraph(p);
     if (graph) {
       graph.destroy();
       graph = null;
-      canvas.replaceWith(canvas.cloneNode(true));
-      canvas = document.querySelector('[data-progress-graph]');
+
     }
-    if (emptyEl) emptyEl.style.display = data.nodes.length ? 'none' : 'grid';
+    if (emptyEl) { emptyEl.hidden = !!data.nodes.length; emptyEl.style.display = data.nodes.length ? 'none' : 'grid'; }
+    drawer.close();
+    nodeList?.destroy();
+    nodeList = mountNodeList(shell.parentElement, data.nodes, selectNode);
     if (!data.nodes.length) {
       if (metaEl) metaEl.textContent = '暂无 wayfinder 数据';
       return;
@@ -120,13 +134,7 @@ export function initProgressGraph() {
       data,
       labelSize: 11,
       ariaLabel: 'wayfinder 开发进度图：effort 与 ticket 节点，虚线为阻塞关系',
-      onSelect(node) {
-        if (!node) { drawer.close(); return; }
-        aside.innerHTML = node.detail.type === 'effort'
-          ? renderEffortDrawer(node.detail.effort)
-          : renderTicketDrawer(node.detail.ticket);
-        drawer.open();
-      },
+      onSelect: selectNode,
     });
     if (metaEl) {
       const efforts = p.efforts.length;
@@ -136,22 +144,17 @@ export function initProgressGraph() {
     }
   }
 
-  let first = true;
-  async function load() {
-    return fetchFirst([`${base}progress.json`]);
-  }
-  async function refresh() {
-    try {
-      render(await load());
-    } catch {
-      if (first && emptyEl) emptyEl.style.display = 'grid';
-      if (metaEl) metaEl.textContent = '进度源不可达';
-    } finally {
-      first = false;
-    }
-  }
-
-  refresh();
-  const stop = startPolling(refresh, null);
-  return { destroy: () => { stop(); if (graph) graph.destroy(); } };
+  const stop = startPolling(
+    ({ signal }) => fetchFirst([`${base}progress.json`], { signal, validate: validateProgress }),
+    (value, error) => {
+      if (error) {
+        if (metaEl) metaEl.textContent = '数据源暂不可达，保留最后有效数据';
+        if (!graph && emptyEl) { emptyEl.hidden = false; emptyEl.style.display = 'grid'; }
+      } else render(value);
+    },
+    { immediate: true },
+  );
+  const destroy = () => { stop(); graph?.destroy(); nodeList?.destroy(); drawer.destroy(); window.removeEventListener('pagehide', destroy); };
+  window.addEventListener('pagehide', destroy, { once: true });
+  return { destroy };
 }

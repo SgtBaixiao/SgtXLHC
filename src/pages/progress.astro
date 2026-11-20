@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { SITE, base } from '../lib/site';
+import { SITE } from '../lib/site';
 ---
 
 <Base title="进度" description={`wayfinder 决策图谱 — ${SITE.description}`} active="/progress">
@@ -55,4 +55,5 @@ import { SITE, base } from '../lib/site';
 <script>
   import { initProgressGraph } from '../components/ProgressGraph.js';
   initProgressGraph();
+  window.addEventListener('pageshow', (event) => { if (event.persisted) initProgressGraph(); });
 </script>
