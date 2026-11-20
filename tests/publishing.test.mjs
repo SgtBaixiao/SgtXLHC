@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, readdirSync, mkdirSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { createPublisher, createNotionSource, guardedBlockClient } from '../scripts/lib/notion-core.mjs';
 import { createGitPublisher } from '../scripts/lib/git-publish.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
+import { NotionToMarkdown } from 'notion-to-md';
 const execute = promisify(execFile);
 const db = '1'.repeat(32), one = '2'.repeat(32), two = '3'.repeat(32);
 function root(t) { const value = mkdtempSync(join(tmpdir(), 'site-publish-')); t.after(() => rmSync(value, { recursive: true, force: true })); return value; }
@@ -44,6 +45,22 @@ test('block traversal rejects repeated cursors and incomplete pagination', async
   const incomplete = guardedBlockClient({ blocks: { children: { list: async () => ({ results: [], has_more: true }) } } });
   await assert.rejects(incomplete.blocks.children.list({ block_id: one }), /Incomplete/);
 });
+test('locked Markdown converter exhausts top-level and nested block pages', async () => {
+  const seen = [];
+  const paragraph = (id, content) => ({ object: 'block', id, type: 'paragraph', has_children: false, paragraph: { rich_text: [{ type: 'text', text: { content }, plain_text: content, annotations: {} }] } });
+  const notion = { blocks: { children: { async list(options) {
+    seen.push(`${options.block_id}:${options.start_cursor || ''}`);
+    if (options.block_id === one && !options.start_cursor) return { results: [{ ...paragraph('parent', 'Parent'), has_children: true }], has_more: true, next_cursor: 'page2' };
+    if (options.block_id === one) return { results: [paragraph('last', 'Last page')], has_more: false, next_cursor: null };
+    if (!options.start_cursor) return { results: [paragraph('child1', 'First child')], has_more: true, next_cursor: 'child2' };
+    return { results: [paragraph('child2', 'Last child')], has_more: false, next_cursor: null };
+  } } } };
+  const n2m = new NotionToMarkdown({ notionClient: notion });
+  const adapter = createNotionSource({ notion, n2m });
+  const body = await adapter.markdown(one);
+  assert.match(body, /Parent/); assert.match(body, /Last page/); assert.match(body, /First child/); assert.match(body, /Last child/);
+  assert.equal(seen.length, 4); assert.equal(n2m.notionClient, notion);
+});
 test('publishing is idempotent and source rename preserves file and URL', async (t) => {
   const dir = root(t), adapter = source(), publisher = createPublisher({ root: dir, databaseId: db, source: adapter });
   const first = await publisher.publish({ pageIds: [one] });
@@ -79,6 +96,42 @@ test('source change during conversion aborts before write and concurrent publica
   let active = 0, peak = 0;
   adapter.markdown = async () => { active++; peak = Math.max(peak, active); await delay(30); active--; return 'body'; };
   await Promise.all([publisher.publish({ pageIds: [one] }), publisher.publish({ pageIds: [two] })]); assert.equal(peak, 1);
+});
+test('existing mixed-case and nested URLs remain valid and share case-normalized collision rules', async (t) => {
+  const dir = root(t), directory = essayDir(dir); mkdirSync(join(directory, 'nested'), { recursive: true });
+  writeFileSync(join(directory, 'manual.md'), '---\ntitle: Manual\ndate: 2026-11-20\nslug: Hello\n---\nOriginal');
+  writeFileSync(join(directory, 'nested/entry.md'), '---\ntitle: Nested\ndate: 2026-11-20\n---\nNested');
+  const adapter = source(), publisher = createPublisher({ root: dir, databaseId: db, source: adapter });
+  await publisher.publish({ pageIds: [one] });
+  adapter.articles.get(two).slug = 'hello';
+  await assert.rejects(publisher.publish({ pageIds: [two] }), /collision/);
+});
+test('empty database and property pages have explicit request budgets', async () => {
+  let pages = 0;
+  const notion = { databases: { query: async () => ({ results: [], has_more: true, next_cursor: `next-${++pages}` }) } };
+  await assert.rejects(createNotionSource({ notion, n2m: {} }).list(db), /Database page budget/); assert.equal(pages, 100);
+  let requests = 0;
+  const page = rawPage(one, { Name: { id: 'title', type: 'title', title: Array.from({ length: 25 }, () => ({ plain_text: 'partial' })) } });
+  notion.databases.query = async () => ({ results: [page] });
+  notion.pages = { properties: { retrieve: async () => ({ object: 'list', results: [], has_more: true, next_cursor: `next-${++requests}` }) } };
+  await assert.rejects(createNotionSource({ notion, n2m: {} }).list(db), /Property page budget/); assert.equal(requests, 100);
+});
+test('partial filesystem failure reports verified completed files and failed phase', async (t) => {
+  const dir = root(t), adapter = source(), publisher = createPublisher({ root: dir, databaseId: db, source: adapter });
+  await publisher.publish({ pageIds: [one, two] });
+  // Block the second atomic replacement after the preflight catalog was read.
+  adapter.markdown = async (id) => {
+    if (id === two) {
+      const file = join(essayDir(dir), '2026-11-20-article-3.md');
+      renameSync(file, `${file}.backup`); mkdirSync(file);
+    }
+    return `Updated ${id}`;
+  };
+  await assert.rejects(publisher.publish({ pageIds: [one, two], overwrite: true }), (error) => {
+    assert.equal(error.phase, 'write'); assert.equal(error.state, 'local-files-retained');
+    assert.equal(error.results[0].written, true); assert.equal(error.results[1].written, false);
+    assert.match(readFileSync(error.results[0].file, 'utf8'), /Updated/); return true;
+  });
 });
 test('Git publisher commits exact generated paths and refuses staged work or unpushed history', async (t) => {
   const dir = root(t), remote = join(dir, 'remote.git'), work = join(dir, 'work');

@@ -1,6 +1,7 @@
 /** Shared public data contract. No DOM, network or Node dependencies. */
 export const AGENT_STATUS = ['idle', 'working', 'blocked', 'error'];
 export const TASK_STATUS = ['pending', 'in-progress', 'blocked', 'resolved'];
+export const TICKET_STATUS = ['open', 'claimed', 'resolved', 'closed'];
 export const LIMITS = Object.freeze({ agents: 250, efforts: 50, tickets: 1000, nodes: 1500, links: 5000 });
 export function text(value, label, max = 2000) {
   if (typeof value !== 'string' || value.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)) throw new Error(`Invalid ${label}`);
@@ -21,6 +22,13 @@ export function timestamp(value, label) {
 export function slugify(value) {
   return String(value).trim().toLowerCase().replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 }
+/** Existing manually authored URLs retain case and safe nested path segments. */
+export function essaySlug(id, explicit) {
+  const slug = explicit || id.replace(/\.md$/, '').replace(/^\d{4}-\d{2}-\d{2}-/, '');
+  if (typeof slug !== 'string' || slug.length > 300 || !slug.split('/').every((part) => /^[\p{L}\p{N}_-]{1,80}$/u.test(part))) throw new Error('Invalid essay URL');
+  return slug;
+}
+export const essayUrlKey = (slug) => slug.normalize('NFC').toLowerCase();
 function boundedArray(value, label, max) {
   if (!Array.isArray(value) || value.length > max) throw new Error(`Invalid ${label}`);
   return value;
@@ -63,7 +71,7 @@ export function validateProgress(value) {
   let total = 0, edgeTotal = 0;
   const efforts = boundedArray(value?.efforts, 'efforts', LIMITS.efforts).map((effort) => {
     const tickets = boundedArray(effort.tickets, 'tickets', LIMITS.tickets).map((ticket) => {
-      if (!['open', 'claimed', 'resolved', 'closed'].includes(ticket.status)) throw new Error('Invalid ticket status');
+      if (!TICKET_STATUS.includes(ticket.status)) throw new Error('Invalid ticket status');
       const blocked_by = boundedArray(ticket.blocked_by, 'dependencies', LIMITS.tickets).map((id) => identifier(id));
       if (new Set(blocked_by).size !== blocked_by.length) throw new Error('Duplicate dependency');
       edgeTotal += blocked_by.length + 1;

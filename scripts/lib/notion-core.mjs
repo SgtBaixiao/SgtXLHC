@@ -1,11 +1,11 @@
 import { readFileSync, readdirSync, existsSync, mkdirSync, lstatSync, realpathSync } from 'node:fs';
-import { join, resolve, basename } from 'node:path';
+import { join, resolve, relative } from 'node:path';
 import { createRequire } from 'node:module';
 import { parse } from 'yaml';
 import { ROOT } from './cli.mjs';
 import { atomicWrite, withLock } from './files.mjs';
 import { createGitPublisher } from './git-publish.mjs';
-import { slugify, identifier, text } from '../../src/lib/contracts.js';
+import { slugify, identifier, text, essaySlug, essayUrlKey } from '../../src/lib/contracts.js';
 export { ROOT, slugify };
 export const ESSAYS_DIR = join(ROOT, 'src/content/essays');
 
@@ -94,6 +94,7 @@ export function createNotionSource({ notion, n2m }) {
         cursor = result.has_more ? result.next_cursor : null;
         if (result.has_more && (!cursor || seen.has(cursor)) || values.length > 10000) throw new Error('Invalid property pagination');
         if (cursor) seen.add(cursor);
+        if (seen.size >= 100) throw new Error('Property page budget exceeded');
       } while (cursor);
       property[property.type] = values;
     }
@@ -111,6 +112,7 @@ export function createNotionSource({ notion, n2m }) {
         cursor = response.has_more ? response.next_cursor : null;
         if (response.has_more && (!cursor || seen.has(cursor)) || pages.length > 10000) throw new Error('Invalid database pagination');
         if (cursor) seen.add(cursor);
+        if (seen.size >= 100) throw new Error('Database page budget exceeded');
       } while (cursor);
       if (new Set(pages.map((page) => page.id)).size !== pages.length) throw new Error('Duplicate Notion page');
       return pages;
@@ -156,13 +158,13 @@ function catalog(directory) {
       const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
       if (!match) throw new Error(`Missing frontmatter: ${name}`);
       const data = parse(match[1]);
-      const slug = validSlug(data.slug || basename(file, '.md').replace(/^\d{4}-\d{2}-\d{2}-/, ''));
+      const slug = essaySlug(relative(directory, file).split('\\').join('/'), data.slug);
       const source = typeof data.source === 'string' && data.source.startsWith('notion:') ? pageId(data.source.slice(7)) : null;
       rows.push({ file, data, slug, source, content });
     }
   }
   walk(directory);
-  if (new Set(rows.map((row) => row.slug)).size !== rows.length) throw new Error('Duplicate existing essay URL');
+  if (new Set(rows.map((row) => essayUrlKey(row.slug))).size !== rows.length) throw new Error('Duplicate existing essay URL');
   const owned = rows.filter((row) => row.source);
   if (new Set(owned.map((row) => row.source)).size !== owned.length) throw new Error('Ambiguous Notion ownership; reconcile duplicate source files');
   return rows;
@@ -184,16 +186,17 @@ export function createPublisher({ databaseId, root = ROOT, source, git }) {
         const canonical = ids.map(pageId);
         if (new Set(canonical).size !== canonical.length) throw new Error('Duplicate page selection');
         if (slugOverride !== undefined && canonical.length !== 1) throw new Error('Slug override requires one page');
-        const existing = catalog(directory), used = new Map(existing.map((row) => [row.slug, row.source]));
+        const existing = catalog(directory), used = new Map(existing.map((row) => [essayUrlKey(row.slug), row.source]));
         const plans = [];
         for (const id of canonical) {
           const article = await getSource().read(id, databaseId);
           if (pageId(article.id) !== id || !article.published) throw new Error('Unexpected source identity or eligibility');
           const previous = existing.find((row) => row.source === id);
           const date = validDate(article.date), title = text(article.title, 'title', 500);
-          const slug = validSlug(slugOverride ?? previous?.slug ?? article.slug ?? (slugify(title) || id));
-          if (used.has(slug) && used.get(slug) !== id) throw new Error(`Essay URL collision: ${slug}`);
-          used.set(slug, id);
+          const slug = previous && slugOverride === undefined ? previous.slug : validSlug(slugOverride ?? article.slug ?? (slugify(title) || id));
+          const key = essayUrlKey(slug);
+          if (used.has(key) && used.get(key) !== id) throw new Error(`Essay URL collision: ${slug}`);
+          used.set(key, id);
           if (!Array.isArray(article.tags) || article.tags.length > 50) throw new Error('Invalid tags');
           const tags = article.tags.map((tag) => text(tag, 'tag', 100));
           const body = await getSource().markdown(id);
@@ -205,11 +208,29 @@ export function createPublisher({ databaseId, root = ROOT, source, git }) {
           const content = `---\n${Object.entries(frontmatter).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n${body}\n`;
           plans.push({ id, file, title, slug, date, content, skipped: !!previous && previous.content !== content && !overwrite, unchanged: previous?.content === content });
         }
+        const results = () => plans.map(({ content, ...result }) => result);
         const targets = plans.filter((plan) => !plan.skipped).map((plan) => plan.file);
-        const destination = push ? await git.preflight(targets) : null;
-        for (const plan of plans) if (!plan.skipped && !plan.unchanged) atomicWrite(plan.file, plan.content);
-        const publication = destination ? await git.publish(targets, destination, 'essays: publish from Notion') : { state: 'local', pushed: false };
-        return { results: plans.map(({ content, ...result }) => result), ...publication };
+        let phase = 'git-preflight';
+        try {
+          const destination = push ? await git.preflight(targets) : null;
+          phase = 'write';
+          for (const plan of plans) {
+            if (!plan.skipped && !plan.unchanged) { atomicWrite(plan.file, plan.content); plan.written = true; }
+          }
+          phase = 'git-publish';
+          const publication = destination ? await git.publish(targets, destination, 'essays: publish from Notion') : { state: 'local', pushed: false };
+          return { results: results(), ...publication };
+        } catch (error) {
+          // A rename can have succeeded before its directory fsync reported failure.
+          for (const plan of plans) {
+            if (plan.skipped || plan.unchanged) continue;
+            try { plan.written = readFileSync(plan.file, 'utf8') === plan.content; } catch { plan.written = false; }
+          }
+          error.phase = phase;
+          error.state = plans.some((plan) => plan.written) ? 'local-files-retained' : 'not-written';
+          error.results = results();
+          throw error;
+        }
       };
       const serialized = () => withLock(join(root, '.site-publisher.lock'), operation, { timeout: 1000 });
       return push ? git.withTransaction(serialized) : serialized();

@@ -74,7 +74,7 @@ test('reduced-motion renderer settles large graphs and destroy removes listeners
   console.log(`501-node reduced-motion fixture: ${Math.round(result.elapsed)} ms`);
 });
 test('local publishing UI renders Notion text safely and keeps destructive options off', async ({ page }) => {
-  const server = createBridge({ publisher: { list: async () => [{ id: '2'.repeat(32), title: '<img src=x onerror="window.pwned=1">', tags: ['<svg onload=bad>'], published: true }], publish: async () => ({ results: [] }) } });
+  const server = createBridge({ publisher: { list: async () => [{ id: '2'.repeat(32), title: '<img src=x onerror="window.pwned=1">', tags: ['<svg onload=bad>'], published: true }], publish: async () => { throw Object.assign(new Error('write failed'), { phase: 'write', results: [{ title: 'Saved article', file: 'saved.md', written: true }] }); } } });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
@@ -82,5 +82,25 @@ test('local publishing UI renders Notion text safely and keeps destructive optio
     await expect(page.locator('#list img')).toHaveCount(0);
     await expect(page.locator('#overwrite')).not.toBeChecked(); await expect(page.locator('#push')).not.toBeChecked();
     await page.locator('#all').click(); await expect(page.locator('#publish')).toBeEnabled();
+    await page.locator('#publish').click();
+    await expect(page.locator('#log')).toContainText('已保留本地文件 saved.md');
+    await expect(page.locator('#log')).toContainText('失败阶段：write');
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+});
+test('destroy during a d3 mouse drag restores window listeners and selection', async ({ page }) => {
+  await page.goto('./');
+  const bundle = await build({ entryPoints: ['src/lib/graph.js'], bundle: true, write: false, format: 'iife', globalName: 'GraphTest', platform: 'browser' });
+  await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  const result = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:200px;height:200px'; document.body.replaceChildren(canvas);
+    const graph = GraphTest.createGraph(canvas, { data: { nodes: [{ id: 'a', label: 'A' }], links: [] } });
+    canvas.dispatchEvent(new MouseEvent('mousedown', { view: window, clientX: 20, clientY: 20, bubbles: true }));
+    const active = window.__on?.some((event) => event.type === 'mousemove' && event.name === 'zoom');
+    graph.destroy();
+    const listeners = (window.__on || []).filter((event) => event.name === 'zoom' || event.name === 'drag').map((event) => `${event.type}.${event.name}`);
+    const before = JSON.stringify(canvas.__zoom);
+    window.dispatchEvent(new MouseEvent('mousemove', { view: window, clientX: 100, clientY: 100 }));
+    return { active, listeners, changed: before !== JSON.stringify(canvas.__zoom), noselect: document.documentElement.__noselect };
+  });
+  expect(result.active).toBe(true); expect(result.listeners).toEqual([]); expect(result.changed).toBe(false); expect(result.noselect).toBeUndefined();
 });

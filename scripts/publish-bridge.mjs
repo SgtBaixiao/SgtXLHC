@@ -8,17 +8,23 @@ function json(res, code, data) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
 }
-async function readBody(req) {
+async function readBody(req, timeout) {
   if (req.headers['content-type']?.split(';')[0] !== 'application/json') throw new Error('JSON content-type required');
-  let bytes = 0; const chunks = [];
-  for await (const chunk of req) {
-    bytes += chunk.length;
-    if (bytes > 16384) throw new Error('Request body exceeds 16 KiB');
-    chunks.push(chunk);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return new Promise((resolve, reject) => {
+    let bytes = 0; const chunks = [];
+    const timer = setTimeout(() => finish(new Error('Request body timed out')), timeout);
+    function finish(error, value) {
+      clearTimeout(timer); req.off('data', data); req.off('end', end); req.off('error', failed); req.off('aborted', aborted);
+      if (error) { req.pause(); reject(error); } else resolve(value);
+    }
+    function data(chunk) { bytes += chunk.length; if (bytes > 16384) finish(new Error('Request body exceeds 16 KiB')); else chunks.push(chunk); }
+    function end() { try { finish(null, JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { finish(new Error('Invalid JSON')); } }
+    function failed(error) { finish(error); }
+    function aborted() { finish(new Error('Request aborted')); }
+    req.on('data', data); req.on('end', end); req.on('error', failed); req.on('aborted', aborted);
+  });
 }
-export function createBridge({ publisher, token = randomBytes(32).toString('hex') }) {
+export function createBridge({ publisher, token = randomBytes(32).toString('hex'), bodyTimeout = 10000 }) {
   let busy = false;
   const server = createServer(async (req, res) => {
     const port = server.address()?.port;
@@ -43,17 +49,16 @@ export function createBridge({ publisher, token = randomBytes(32).toString('hex'
       if (busy) return json(res, 409, { error: 'Publication in progress' });
       busy = true;
       try {
-        const body = await readBody(req);
+        const body = await readBody(req, bodyTimeout);
         if (!body || Object.keys(body).some((key) => !['page_ids', 'force', 'commit'].includes(key))) throw new Error('Invalid publication request');
         const output = await publisher.publish({ pageIds: body.page_ids, overwrite: body.force ?? false, push: body.commit ?? false });
         return json(res, 200, output);
       } finally { busy = false; }
-    } catch (error) { if (!res.destroyed) json(res, 400, { error: error.message }); }
+    } catch (error) { if (!res.destroyed) json(res, 400, { error: error.message, phase: error.phase, state: error.state, results: error.results, commit: error.commit }); }
   });
   server.requestTimeout = 10000;
   server.headersTimeout = 10000;
   server.keepAliveTimeout = 1000;
-  server.on('connection', (socket) => socket.setTimeout(15000, () => socket.destroy()));
   return server;
 }
 export async function main(argv) {

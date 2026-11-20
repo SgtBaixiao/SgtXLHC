@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve, basename } from 'node:path';
 import { args, ROOT, isMain, run } from './lib/cli.mjs';
-import { slugify, validateProgress } from '../src/lib/contracts.js';
+import { slugify, validateProgress, TICKET_STATUS } from '../src/lib/contracts.js';
 import { withLock, writeJson } from './lib/files.mjs';
 
 const isTicketFile = (n) => /^\d{2}-.+\.md$/.test(n);
@@ -37,7 +37,7 @@ export function parseTicket(file) {
   const title = titleMatch ? titleMatch[1].trim() : basename(file, '.md');
   const type = text.match(/^Type:\s*(.+)$/m)?.[1]?.trim() || '';
   let status = text.match(/^Status:\s*(.+)$/m)?.[1]?.trim()?.toLowerCase() || 'open';
-  if (!['open', 'claimed', 'resolved', 'closed'].includes(status)) throw new Error(`Invalid ticket status in ${file}`);
+  if (!TICKET_STATUS.includes(status)) throw new Error(`Invalid ticket status in ${file}`);
   const dependencyLine = text.match(/^Blocked by:[ \t]*(.*)$/m)?.[1]?.trim() || '';
   const blockedBy = !dependencyLine || /^(none|—|-)$/i.test(dependencyLine) ? [] : dependencyLine.split(',').map((entry) => {
     const id = entry.trim().match(/^(\d{2})(?:\b|$)/)?.[1] || entry.match(/issues\/(\d{2})-/)?.[1];

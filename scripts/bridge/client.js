@@ -30,7 +30,11 @@ $('publish').onclick = async () => {
   try {
     const response = await fetch('/api/publish', { method: 'POST', headers: { 'content-type': 'application/json', 'x-site-token': token }, body: JSON.stringify({ page_ids: selected(), force: $('overwrite').checked, commit: $('push').checked }) });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
+    if (!response.ok) {
+      for (const result of data.results || []) if (result.written) log(`${result.title}：已保留本地文件 ${result.file}`);
+      if (data.phase) log(`失败阶段：${data.phase}`);
+      throw new Error(data.error);
+    }
     for (const result of data.results) log(`${result.title}：${result.skipped ? '已存在，跳过' : result.unchanged ? '内容未变' : '已写入本地'}`);
     log(data.pushed ? `已推送：${data.commit}` : '本次保存完成');
   } catch (error) { log(`发布失败：${error.message}`); }

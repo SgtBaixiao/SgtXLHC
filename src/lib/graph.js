@@ -18,6 +18,7 @@
 import { forceSimulation, forceLink, forceManyBody, forceX, forceY, forceCollide } from 'd3-force';
 import { zoom as d3zoom, zoomIdentity } from 'd3-zoom';
 import { select } from 'd3-selection';
+import { dragEnable } from 'd3-drag';
 import { LIMITS } from './contracts.js';
 import { cssVar } from './dom.js';
 export { cssVar } from './dom.js';
@@ -132,10 +133,14 @@ export function createGraph(canvas, opts = {}) {
   }
 
   // ---- 交互 ----
+  let gestureView = null;
   const zoomBeh = d3zoom()
     .scaleExtent([0.35, 4])
+    .duration(0)
     .filter((ev) => !ev.button || ev.button === 0)
-    .on('zoom', (ev) => { transform = ev.transform; draw(); });
+    .on('start.lifecycle', (ev) => { if (ev.sourceEvent?.type === 'mousedown') gestureView = ev.sourceEvent.view; })
+    .on('end.lifecycle', () => { gestureView = null; })
+    .on('zoom', (ev) => { if (!destroyed) { transform = ev.transform; draw(); } });
   select(canvas).call(zoomBeh);
 
   const toSim = (e) => {
@@ -433,6 +438,13 @@ export function createGraph(canvas, opts = {}) {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      if (gestureView) {
+        select(gestureView).on('mousemove.zoom mouseup.zoom', null);
+        dragEnable(gestureView, false); gestureView = null;
+      }
+      const gesture = canvas.__zooming;
+      if (gesture?.wheel) clearTimeout(gesture.wheel);
+      delete canvas.__zooming;
       events.abort();
       cancelAnimationFrame(raf);
       ro.disconnect();
@@ -441,6 +453,7 @@ export function createGraph(canvas, opts = {}) {
       document.removeEventListener('visibilitychange', activity);
       sim.stop();
       select(canvas).on('.zoom', null);
+      zoomBeh.on('.lifecycle', null).on('zoom', null);
     },
     resetView() {
       transform = zoomIdentity;

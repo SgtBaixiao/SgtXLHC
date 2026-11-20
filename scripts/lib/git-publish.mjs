@@ -39,7 +39,11 @@ export function createGitPublisher(root) {
       const commit = await git('rev-parse', 'HEAD');
       if (await git('rev-parse', 'HEAD^') !== destination.head) throw new Error('Git history changed during commit; inspect local commit before pushing');
       try { await git('push', destination.remote, `${commit}:refs/heads/${destination.target}`); }
-      catch { throw new Error(`Files committed as ${commit}; push failed or outcome unknown. Inspect remote before retrying.`); }
+      catch {
+        const error = new Error(`Files committed as ${commit}; push failed or outcome unknown. Inspect remote before retrying.`);
+        error.commit = commit;
+        throw error;
+      }
       return { state: 'pushed', pushed: true, commit };
     },
   };

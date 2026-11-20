@@ -9,6 +9,17 @@ async function fixture(t, publisher = { list: async () => [], publish: async (op
   return `http://127.0.0.1:${server.address().port}`;
 }
 const headers = { 'x-site-token': 'a'.repeat(64), 'content-type': 'application/json' };
+test('incomplete request body times out without invoking publisher', async (t) => {
+  let published = false;
+  const server = createBridge({ publisher: { publish: async () => { published = true; } }, token: 'a'.repeat(64), bodyTimeout: 20 });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const status = await new Promise((resolve, reject) => {
+    const req = request(`http://127.0.0.1:${server.address().port}/api/publish`, { method: 'POST', headers: { ...headers, 'content-length': 100 } }, (res) => { res.resume(); resolve(res.statusCode); req.destroy(); });
+    req.on('error', reject); req.write('{');
+  });
+  assert.equal(status, 400); assert.equal(published, false);
+});
 test('bridge rejects foreign Host/Origin and requests without session capability', async (t) => {
   const url = await fixture(t);
   assert.equal((await fetch(`${url}/api/pages`)).status, 403);
@@ -30,4 +41,11 @@ test('bridge rejects overlapping mutation requests and serves a CSP-protected ex
   assert.equal((await fetch(`${url}/api/publish`, { method: 'POST', headers, body: '{}' })).status, 409);
   finish({ results: [] }); assert.equal((await first).status, 200);
   const page = await fetch(url); assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/); assert.match(await page.text(), /src="\/client.js"/);
+});
+test('bridge includes completed files and failure phase in partial publication errors', async (t) => {
+  const error = Object.assign(new Error('write failed'), { phase: 'write', state: 'local-files-retained', results: [{ id: 'id', file: 'saved.md', written: true }] });
+  const url = await fixture(t, { publish: async () => { throw error; } });
+  const response = await fetch(`${url}/api/publish`, { method: 'POST', headers, body: '{"page_ids":["id"]}' });
+  assert.equal(response.status, 400); const data = await response.json();
+  assert.equal(data.phase, 'write'); assert.equal(data.results[0].written, true);
 });

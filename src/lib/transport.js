@@ -9,7 +9,11 @@ export async function fetchFirst(urls, { signal, timeout = 8000, validate = (val
     const timer = setTimeout(() => controller.abort(new Error('Source timed out')), timeout);
     try {
       const response = await fetcher(url, { cache: 'no-store', signal: controller.signal });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {});
+        controller.abort();
+        throw new Error(`HTTP ${response.status}`);
+      }
       const reader = response.body.getReader(), chunks = [];
       let bytes = 0;
       try {

@@ -26,3 +26,9 @@ test('polling failure reports error and increases interval', async () => {
   await delay(115); stop();
   assert.ok(times.length >= 2); assert.ok(times[1] - times[0] >= 25); assert.equal(errors[0], 'unavailable');
 });
+test('HTTP error bodies are cancelled before continuing fallback', async () => {
+  let cancelled = false;
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('still streaming')); }, cancel() { cancelled = true; } });
+  const result = await fetchFirst(['error', 'good'], { fetcher: async (url) => url === 'error' ? new Response(stream, { status: 500 }) : new Response('{"ok":true}') });
+  assert.equal(result.ok, true); assert.equal(cancelled, true);
+});
