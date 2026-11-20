@@ -133,13 +133,20 @@ export function createGraph(canvas, opts = {}) {
   }
 
   // ---- 交互 ----
-  let gestureView = null;
+  let mouseView = null;
+  const zoomGestures = new Set();
   const zoomBeh = d3zoom()
     .scaleExtent([0.35, 4])
     .duration(0)
     .filter((ev) => !ev.button || ev.button === 0)
-    .on('start.lifecycle', (ev) => { if (ev.sourceEvent?.type === 'mousedown') gestureView = ev.sourceEvent.view; })
-    .on('end.lifecycle', () => { gestureView = null; })
+    .on('start.lifecycle', (ev) => {
+      if (canvas.__zooming) zoomGestures.add(canvas.__zooming);
+      if (ev.sourceEvent?.type === 'mousedown') mouseView = ev.sourceEvent.view;
+    })
+    .on('end.lifecycle', (ev) => {
+      if (ev.sourceEvent?.type === 'mouseup') mouseView = null;
+      for (const gesture of zoomGestures) if (!gesture.active) zoomGestures.delete(gesture);
+    })
     .on('zoom', (ev) => { if (!destroyed) { transform = ev.transform; draw(); } });
   select(canvas).call(zoomBeh);
 
@@ -438,12 +445,12 @@ export function createGraph(canvas, opts = {}) {
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      if (gestureView) {
-        select(gestureView).on('mousemove.zoom mouseup.zoom', null);
-        dragEnable(gestureView, false); gestureView = null;
+      if (mouseView) {
+        select(mouseView).on('mousemove.zoom mouseup.zoom', null);
+        dragEnable(mouseView, false); mouseView = null;
       }
-      const gesture = canvas.__zooming;
-      if (gesture?.wheel) clearTimeout(gesture.wheel);
+      for (const gesture of zoomGestures) if (gesture.wheel) clearTimeout(gesture.wheel);
+      zoomGestures.clear();
       delete canvas.__zooming;
       events.abort();
       cancelAnimationFrame(raf);

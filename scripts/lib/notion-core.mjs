@@ -29,17 +29,31 @@ export function pageId(value) {
 }
 /** Bound SDK recursive block traversal without changing its Markdown conversion. */
 export function guardedBlockClient(notion) {
-  const requests = new Set();
-  let blocks = 0;
+  const responses = new Map(), cursors = new Map();
+  let calls = 0, blocks = 0;
   return { ...notion, blocks: { ...notion.blocks, children: { ...notion.blocks?.children, async list(options) {
-    const key = `${options.block_id}:${options.start_cursor || ''}`;
-    if (requests.has(key) || requests.size >= 1000) throw new Error('Repeated or oversized block traversal');
-    requests.add(key);
-    const result = await notion.blocks.children.list(options);
-    if (!Array.isArray(result.results) || result.has_more && !result.next_cursor) throw new Error('Incomplete block pagination');
-    blocks += result.results.length;
-    if (blocks > 10000) throw new Error('Article block budget exceeded');
-    return result;
+    // The converter legitimately reads table children twice. Cache complete pages,
+    // but count every call so recursive block cycles cannot loop over the cache.
+    if (++calls > 1000) throw new Error('Article block request budget exceeded');
+    const cursor = options.start_cursor || '', key = JSON.stringify([options.block_id, cursor]);
+    if (!responses.has(key)) responses.set(key, (async () => {
+      const result = await notion.blocks.children.list(options);
+      if (!Array.isArray(result.results) || result.has_more && (typeof result.next_cursor !== 'string' || !result.next_cursor) || !result.has_more && result.next_cursor != null) throw new Error('Incomplete block pagination');
+      const chain = cursors.get(options.block_id) || new Map();
+      cursors.set(options.block_id, chain);
+      chain.set(cursor, result.has_more ? result.next_cursor : null);
+      const seen = new Set([cursor]);
+      let next = chain.get(cursor);
+      while (next != null) {
+        if (seen.has(next)) throw new Error('Repeated block pagination cursor');
+        seen.add(next); next = chain.get(next);
+      }
+      blocks += result.results.length;
+      if (blocks > 10000) throw new Error('Article block budget exceeded');
+      return result;
+    })());
+    // notion-to-md annotates blocks; keep its mutations out of the cached source.
+    return structuredClone(await responses.get(key));
   } } } };
 }
 function validDate(value) {

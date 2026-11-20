@@ -40,10 +40,22 @@ test('Notion long title properties are paginated', async () => {
 test('block traversal rejects repeated cursors and incomplete pagination', async () => {
   const client = guardedBlockClient({ blocks: { children: { list: async () => ({ results: [], has_more: true, next_cursor: 'same' }) } } });
   await client.blocks.children.list({ block_id: one });
-  await client.blocks.children.list({ block_id: one, start_cursor: 'same' });
   await assert.rejects(client.blocks.children.list({ block_id: one, start_cursor: 'same' }), /Repeated/);
   const incomplete = guardedBlockClient({ blocks: { children: { list: async () => ({ results: [], has_more: true }) } } });
   await assert.rejects(incomplete.blocks.children.list({ block_id: one }), /Incomplete/);
+  const cycle = guardedBlockClient({ blocks: { children: { list: async ({ start_cursor }) => ({ results: [], has_more: true, next_cursor: start_cursor === 'b' ? 'a' : start_cursor === 'a' ? 'b' : 'a' }) } } });
+  await cycle.blocks.children.list({ block_id: one });
+  await cycle.blocks.children.list({ block_id: one, start_cursor: 'a' });
+  await assert.rejects(cycle.blocks.children.list({ block_id: one, start_cursor: 'b' }), /Repeated/);
+});
+test('cached block pages remain immutable and repeated recursion still exhausts the call budget', async () => {
+  let requests = 0;
+  const client = guardedBlockClient({ blocks: { children: { list: async () => { requests++; return { results: [{ id: 'original' }], has_more: false, next_cursor: null }; } } } });
+  (await client.blocks.children.list({ block_id: one })).results[0].id = 'mutated';
+  assert.equal((await client.blocks.children.list({ block_id: one })).results[0].id, 'original');
+  for (let index = 2; index < 1000; index++) await client.blocks.children.list({ block_id: one });
+  await assert.rejects(client.blocks.children.list({ block_id: one }), /request budget/);
+  assert.equal(requests, 1);
 });
 test('locked Markdown converter exhausts top-level and nested block pages', async () => {
   const seen = [];
@@ -60,6 +72,20 @@ test('locked Markdown converter exhausts top-level and nested block pages', asyn
   const body = await adapter.markdown(one);
   assert.match(body, /Parent/); assert.match(body, /Last page/); assert.match(body, /First child/); assert.match(body, /Last child/);
   assert.equal(seen.length, 4); assert.equal(n2m.notionClient, notion);
+});
+test('real Markdown converter publishes tables whose children are read twice', async (t) => {
+  const seen = [], table = '4'.repeat(32);
+  const notion = { pages: { retrieve: async () => rawPage(one, { 日期: { type: 'date', date: { start: '2026-11-20' } } }) }, blocks: { children: { async list(options) {
+    seen.push(options.block_id);
+    return { results: options.block_id === one
+      ? [{ object: 'block', id: table, type: 'table', has_children: true, table: { table_width: 1, has_column_header: true, has_row_header: false } }]
+      : [{ object: 'block', id: 'row', type: 'table_row', has_children: false, table_row: { cells: [[{ type: 'text', text: { content: 'Cell' }, plain_text: 'Cell', annotations: {} }]] } }], has_more: false, next_cursor: null };
+  } } } };
+  const adapter = createNotionSource({ notion, n2m: new NotionToMarkdown({ notionClient: notion }) });
+  const publisher = createPublisher({ root: root(t), databaseId: db, source: adapter });
+  const result = await publisher.publish({ pageIds: [one] });
+  assert.match(readFileSync(result.results[0].file, 'utf8'), /\| Cell \|/);
+  assert.deepEqual(seen, [one, table]);
 });
 test('publishing is idempotent and source rename preserves file and URL', async (t) => {
   const dir = root(t), adapter = source(), publisher = createPublisher({ root: dir, databaseId: db, source: adapter });

@@ -104,3 +104,22 @@ test('destroy during a d3 mouse drag restores window listeners and selection', a
   });
   expect(result.active).toBe(true); expect(result.listeners).toEqual([]); expect(result.changed).toBe(false); expect(result.noselect).toBeUndefined();
 });
+test('overlapping wheel and mouse gestures remain releasable after wheel idle', async ({ page }) => {
+  await page.goto('./');
+  const bundle = await build({ entryPoints: ['src/lib/graph.js'], bundle: true, write: false, format: 'iife', globalName: 'GraphTest', platform: 'browser' });
+  await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  const result = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.style.cssText = 'width:200px;height:200px'; document.body.replaceChildren(canvas);
+    const graph = GraphTest.createGraph(canvas, { data: { nodes: [{ id: 'a', label: 'A' }], links: [] } });
+    canvas.dispatchEvent(new WheelEvent('wheel', { view: window, clientX: 20, clientY: 20, deltaY: -100, bubbles: true, cancelable: true }));
+    canvas.dispatchEvent(new MouseEvent('mousedown', { view: window, clientX: 20, clientY: 20, bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    const active = window.__on?.some((event) => event.type === 'mousemove' && event.name === 'zoom');
+    graph.destroy();
+    const listeners = (window.__on || []).filter((event) => event.name === 'zoom' || event.name === 'drag').map((event) => `${event.type}.${event.name}`);
+    const before = JSON.stringify(canvas.__zoom);
+    window.dispatchEvent(new MouseEvent('mousemove', { view: window, clientX: 100, clientY: 100 }));
+    return { active, listeners, changed: before !== JSON.stringify(canvas.__zoom), noselect: document.documentElement.__noselect };
+  });
+  expect(result.active).toBe(true); expect(result.listeners).toEqual([]); expect(result.changed).toBe(false); expect(result.noselect).toBeUndefined();
+});
